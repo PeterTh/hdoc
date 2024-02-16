@@ -94,7 +94,7 @@ void fillNamespace(hdoc::types::Symbol& s, const clang::NamedDecl* d, const hdoc
 bool isInIgnoreList(const clang::Decl* d, const hdoc::types::Config* cfg) {
 
   // handle path-based ignore
-  const auto ignorePaths = cfg->ignorePaths; 
+  const auto ignorePaths = cfg->ignorePaths;
   const auto rootDir = cfg->rootDir;
 
   const auto fileLoc = d->getASTContext().getSourceManager().getFileLoc(d->getLocation()); // Resolves macro locations
@@ -215,8 +215,11 @@ std::string getFunctionSignature(hdoc::types::FunctionSymbol& f) {
   f.postTemplate = signature.size();
 
   // Various qualifiers
+  signature += f.isNoDiscard ? "[[nodiscard]] " : "";
   signature += f.storageClass == clang::SC_Static ? "static " : "";
   signature += f.storageClass == clang::SC_Extern ? "extern " : "";
+  signature += f.isExplicit ? "explicit " : "";
+  signature += f.isNoReturn ? "[[noreturn]] " : "";
   signature += f.isInline ? "inline " : "";
   signature += f.isVirtual ? "virtual " : "";
   signature += f.isConstexpr ? "constexpr " : "";

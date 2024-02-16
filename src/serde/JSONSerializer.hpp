@@ -71,8 +71,14 @@ public:
     writer.Bool(f.isConstexpr);
     writer.String("isConsteval");
     writer.Bool(f.isConsteval);
+    writer.String("isExplicit");
+    writer.Bool(f.isExplicit);
     writer.String("isInline");
     writer.Bool(f.isInline);
+    writer.String("isNoDiscard");
+    writer.Bool(f.isNoDiscard);
+    writer.String("isNoReturn");
+    writer.Bool(f.isNoReturn);
     writer.String("isConst");
     writer.Bool(f.isConst);
     writer.String("isVolatile");

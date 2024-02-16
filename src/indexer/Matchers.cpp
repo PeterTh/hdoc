@@ -94,7 +94,10 @@ void hdoc::indexer::matchers::FunctionMatcher::run(const clang::ast_matchers::Ma
   fillOutSymbol(f, res, this->cfg->rootDir);
 
   // Determine if the function is a conversion operator early, since it influences proto generation
-  f.isConversionOp = llvm::isa<clang::CXXConversionDecl>(res);
+  if (const auto* conversion = llvm::dyn_cast<clang::CXXConversionDecl>(res)) {
+    f.isConversionOp = true;
+    f.isExplicit     = conversion->isExplicit();
+  }
 
   // Get a bunch of qualifiers
   f.isVariadic   = res->isVariadic();
@@ -102,9 +105,15 @@ void hdoc::indexer::matchers::FunctionMatcher::run(const clang::ast_matchers::Ma
   f.isConstexpr  = res->isConstexprSpecified() && !res->isExplicitlyDefaulted();
   f.isConsteval  = res->isConsteval();
   f.isInline     = res->isInlineSpecified();
-  f.isNoExcept   = clang::isNoexceptExceptionSpec(res->getExceptionSpecType());
+  f.isNoDiscard  = res->hasAttr<clang::WarnUnusedResultAttr>();
+  f.isNoExcept   = clang::isNoexceptExceptionSpec(res->getExceptionSpecType()); // TODO incorrect - may be parameterized!
+  f.isNoReturn   = res->isNoReturn();
   f.storageClass = res->getStorageClass();
   f.access       = res->getAccess();
+
+  if (const auto ctor = llvm::dyn_cast<clang::CXXConstructorDecl>(res)) {
+    f.isExplicit = ctor->isExplicit();
+  }
 
   // Get ref qualifiers
   if (const auto* fp = res->getType()->getAs<clang::FunctionProtoType>()) {
@@ -271,7 +280,7 @@ std::vector<std::string> templateArgsToStrings(const clang::TemplateArgumentList
             replacement = decl->getNameAsString();
           }
           // If we still don't have anything here, we are dealing with a param which no longer has a name at this point
-          // we try to look up its name in the template params of the record we are currently processing 
+          // we try to look up its name in the template params of the record we are currently processing
           if(replacement == "") {
             auto idx = templateType->getIndex();
             if(idx < record.templateParams.size()) {
@@ -439,7 +448,7 @@ void hdoc::indexer::matchers::RecordMatcher::run(const clang::ast_matchers::Matc
   }
 
   // For template specializations, include the template arguments in the name
-  // We do this after the template handling above, so we can re-use the TemplateTypeParm names 
+  // We do this after the template handling above, so we can re-use the TemplateTypeParm names
   // stored for c for those template arguments which were *not* specialized and are represented
   // as canonical ("type-parameter-*") in the template argument list
   if (const auto* spec = llvm::dyn_cast<clang::ClassTemplateSpecializationDecl>(res)) {

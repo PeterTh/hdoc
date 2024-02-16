@@ -159,7 +159,10 @@ public:
   bool                       isRecordMember    = false; ///< Is it a method?
   bool                       isConstexpr       = false; ///< Is it marked constexpr?
   bool                       isConsteval       = false; ///< Is it marked consteval?
+  bool                       isExplicit        = false; ///< Is it marked explicit?
   bool                       isInline          = false; ///< Is it marked inline?
+  bool                       isNoDiscard       = false; ///< Is it marked [[nodiscard]]?
+  bool                       isNoReturn        = false; ///< Is it marked [[noreturn]]?
   bool                       isConst           = false; ///< Is it marked const?
   bool                       isVolatile        = false; ///< Is it marked volatile?
   bool                       isRestrict        = false; ///< Is it marked restrict?
