@@ -121,7 +121,10 @@ hdoc::types::FunctionSymbol JSONDeserializer::deserializeFunctionSymbol(const ra
   s.isRecordMember       = obj["isRecordMember"].GetBool();
   s.isConstexpr          = obj["isConstexpr"].GetBool();
   s.isConsteval          = obj["isConsteval"].GetBool();
+  s.isExplicit           = obj["isExplicit"].GetBool();
   s.isInline             = obj["isInline"].GetBool();
+  s.isNoDiscard          = obj["isNoDiscard"].GetBool();
+  s.isNoReturn           = obj["isNoReturn"].GetBool();
   s.isConst              = obj["isConst"].GetBool();
   s.isVolatile           = obj["isVolatile"].GetBool();
   s.isRestrict           = obj["isRestrict"].GetBool();
