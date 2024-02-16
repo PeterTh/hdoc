@@ -1,3 +1,10 @@
+<h1 align="center">
+    <img
+        width="300"
+        alt="🥬doc logo"
+        src="assets/icon.png">
+</h1>
+
 <h3 align="center">
     🥬doc: a documentation tool for C++
 </h3>
