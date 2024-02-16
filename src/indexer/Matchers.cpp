@@ -134,8 +134,10 @@ void hdoc::indexer::matchers::FunctionMatcher::run(const clang::ast_matchers::Ma
   for (const auto* i : res->parameters()) {
     hdoc::types::FunctionParam a;
     a.name      = i->getNameAsString();
-    a.type.name = i->getType().getAsString(pp);
-    a.type.id   = getTypeSymbolID(i->getType());
+    auto effectiveType = i->getType();
+    effectiveType.removeLocalFastQualifiers(); // drop top-level cvr-qualifiers since they are not part of the signature
+    a.type.name = effectiveType.getAsString(pp);
+    a.type.id   = getTypeSymbolID(effectiveType);
     if (i->hasDefaultArg()) {
       a.defaultValue = i->hasUninstantiatedDefaultArg() ? exprToString(i->getUninstantiatedDefaultArg(), pp)
                                                         : exprToString(i->getDefaultArg(), pp);
