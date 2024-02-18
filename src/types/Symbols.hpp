@@ -57,14 +57,14 @@ struct SymbolID {
 
 /// @brief Base class for all other types of symbols
 struct Symbol {
-  std::string           name = "";              ///< Function name, record name, enum name etc.
-  std::string           briefComment = "";      ///< Text following @brief or \brief command
-  std::string           docComment = "";        ///< All other Doxygen text attached to this symbol's documentation
-  hdoc::types::SymbolID ID;                     ///< Unique identifier for this Symbol
-  std::string           file = "";              ///< File where this Symbol is declared, relative to source root
-  std::uint64_t         line = 0;               ///< Line number in the file
-  hdoc::types::SymbolID parentNamespaceID;      ///< ID of the parent namespace (or record)
-  bool                  isDetail = false;       ///< Is this symbol in a "detail" namespace?
+  std::string           name         = ""; ///< Function name, record name, enum name etc.
+  std::string           briefComment = ""; ///< Text following @brief or \brief command
+  std::string           docComment   = ""; ///< All other Doxygen text attached to this symbol's documentation
+  hdoc::types::SymbolID ID;                ///< Unique identifier for this Symbol
+  std::string           file = "";         ///< File where this Symbol is declared, relative to source root
+  std::uint64_t         line = 0;          ///< Line number in the file
+  hdoc::types::SymbolID parentNamespaceID; ///< ID of the parent namespace (or record)
+  bool                  isDetail = false;  ///< Is this symbol in a "detail" namespace?
 
   /// @brief Comparison operator sorts alphabetically by symbol name, sort detail symbols last
   bool operator<(const Symbol& s) const {
@@ -104,9 +104,11 @@ struct TemplateParam {
 /// @brief Represents a using declaration or similar alias
 struct AliasSymbol : public Symbol {
 public:
-  TypeRef target;                                    ///< The type this using declaration aliases
-  bool isRecordMember = false;                       ///< Is it a member alias?
-  clang::AccessSpecifier access = clang::AS_private; ///< Access type, i.e. public/protected/private
+  TypeRef                    target;                             ///< The type this using declaration aliases
+  bool                       isRecordMember = false;             ///< Is it a member alias?
+  clang::AccessSpecifier     access         = clang::AS_private; ///< Access type, i.e. public/protected/private
+  std::vector<TemplateParam> templateParams;                     ///< All of the template parameters for this alias
+  std::string                proto;                              ///< Full "prototype", including template parameters
 
   std::string url() const {
     return "a" + this->ID.str() + ".html";

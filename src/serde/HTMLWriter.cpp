@@ -3,6 +3,7 @@
 
 #include "ctml.hpp"
 #include "spdlog/spdlog.h"
+#include "spdlog/fmt/fmt.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Format/Format.h"
 #include "llvm/Support/JSON.h"
@@ -572,7 +573,7 @@ void hdoc::serde::HTMLWriter::printFunctions() const {
 }
 
 static std::string getAliasHTML(const hdoc::types::AliasSymbol& a) {
-  std::string str = "using " + a.name + " = " + a.target.name;
+  auto str = fmt::format("{} = {};", a.proto, a.target.name);
   str = hdoc::serde::clangFormat(str);
   str = escapeForHTML(str);
   return str;
@@ -599,6 +600,27 @@ static void printAlias(const hdoc::types::AliasSymbol& a,
   appendAsMarkdown(a.docComment, main);
 
   main.AddChild(getDeclaredAtNode(a, gitRepoURL, gitDefaultBranch));
+
+  // Print template parameters (with type, name, default value, and comment) as a list
+  // TODO this is duplicated from printRecord()
+  if (a.templateParams.size() > 0) {
+    main.AddChild(CTML::Node("h2", "Template Parameters"));
+    CTML::Node dl("dl");
+
+    for (auto tparam : a.templateParams) {
+      auto dt = CTML::Node("dt.is-family-code").AppendRawHTML(tparam.type);
+      dt.AddChild(CTML::Node("b", " " + tparam.name));
+
+      if (tparam.defaultValue != "") {
+        dt.AppendText(" = " + tparam.defaultValue);
+      }
+      dl.AddChild(dt);
+      if (tparam.docComment != "") {
+        dl.AddChild(CTML::Node("dd", tparam.docComment));
+      }
+    }
+    main.AddChild(dl);
+  }
 
   // If we have a symbol, link it
   if (a.target.id.raw() != 0) {

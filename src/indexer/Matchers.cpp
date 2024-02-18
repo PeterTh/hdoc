@@ -63,6 +63,46 @@ static hdoc::types::SymbolID getTypeSymbolID(const clang::QualType& typ) {
   }
 }
 
+static std::vector<hdoc::types::TemplateParam> collectTemplateParams(const clang::Decl*           res,
+                                                                     const clang::PrintingPolicy& pp) {
+  std::vector<hdoc::types::TemplateParam> templateParams;
+  // Rather than dealing independently with ClassTemplateDecl and ClassTemplatePartialSpecializationDecl,
+  // we can ask the generic Decl for the "described Template Params", which is exactly what we want
+  const auto* describedTemplateParms = res->getDescribedTemplateParams();
+  if (describedTemplateParms) {
+    for (const auto* paramDecl : describedTemplateParms->asArray()) {
+      hdoc::types::TemplateParam tparam;
+      if (const auto& templateType = llvm::dyn_cast<clang::TemplateTypeParmDecl>(paramDecl)) {
+        tparam.templateType    = hdoc::types::TemplateParam::TemplateType::TemplateTypeParameter;
+        tparam.isTypename      = templateType->wasDeclaredWithTypename();
+        tparam.isParameterPack = templateType->isParameterPack();
+        tparam.name            = templateType->getNameAsString();
+        // Get default argument if it exists
+        tparam.defaultValue =
+            templateType->hasDefaultArgument() ? templateType->getDefaultArgument().getAsString(pp) : "";
+      } else if (const auto* nonTypeTemplate = llvm::dyn_cast<clang::NonTypeTemplateParmDecl>(paramDecl)) {
+        tparam.templateType    = hdoc::types::TemplateParam::TemplateType::NonTypeTemplate;
+        tparam.type            = nonTypeTemplate->getType().getAsString(pp);
+        tparam.isParameterPack = nonTypeTemplate->isParameterPack();
+        tparam.name            = nonTypeTemplate->getNameAsString();
+        // Get default argument if it exists
+        tparam.defaultValue =
+            nonTypeTemplate->hasDefaultArgument() ? exprToString(nonTypeTemplate->getDefaultArgument(), pp) : "";
+      } else if (const auto* templateTemplateType = llvm::dyn_cast<clang::TemplateTemplateParmDecl>(paramDecl)) {
+        tparam.templateType = hdoc::types::TemplateParam::TemplateType::TemplateTemplateType;
+        tparam.type =
+            clang::Lexer::getSourceText(clang::CharSourceRange::getCharRange(templateTemplateType->getSourceRange()),
+                                        res->getASTContext().getSourceManager(),
+                                        res->getASTContext().getLangOpts());
+        tparam.name            = templateTemplateType->getNameAsString();
+        tparam.isParameterPack = templateTemplateType->isParameterPack() ? "..." : ""; // What? TODO: investigate
+      }
+      templateParams.emplace_back(tparam);
+    }
+  }
+  return templateParams;
+}
+
 void hdoc::indexer::matchers::FunctionMatcher::run(const clang::ast_matchers::MatchFinder::MatchResult& Result) {
   const auto res = Result.Nodes.getNodeAs<clang::FunctionDecl>("function");
 
@@ -181,7 +221,8 @@ void hdoc::indexer::matchers::UsingMatcher::run(const clang::ast_matchers::Match
   const auto res = Result.Nodes.getNodeAs<clang::NamedDecl>("using");
 
   // Only interested in aliases
-  if(!llvm::isa_and_present<clang::UsingDecl>(res) && !llvm::isa_and_present<clang::UsingShadowDecl>(res) && !llvm::isa_and_present<clang::TypeAliasDecl>(res)) {
+  if(!llvm::isa_and_present<clang::UsingDecl>(res) && !llvm::isa_and_present<clang::UsingShadowDecl>(res)
+     && !llvm::isa_and_present<clang::TypedefNameDecl>(res)) {
     return;
   }
 
@@ -209,12 +250,17 @@ void hdoc::indexer::matchers::UsingMatcher::run(const clang::ast_matchers::Match
   }
   this->index->aliases.reserve(ID);
 
+  clang::PrintingPolicy pp(res->getASTContext().getLangOpts());
+
   hdoc::types::AliasSymbol a;
   a.ID = ID;
   fillOutSymbol(a, res, this->cfg->rootDir);
 
   a.isRecordMember = res->isCXXClassMember();
   if(a.isRecordMember) a.access = res->getAccess();
+  a.templateParams = collectTemplateParams(res, pp);
+
+  a.proto = getTypeAliasProto(a);
 
   spdlog::debug(" ------------- ");
   spdlog::debug("Using: {}", res->getQualifiedNameAsString());
@@ -229,10 +275,9 @@ void hdoc::indexer::matchers::UsingMatcher::run(const clang::ast_matchers::Match
     spdlog::debug(" + Target: {}", usingShadowDecl->getTargetDecl()->getQualifiedNameAsString());
     a.target.id = buildID(usingShadowDecl->getTargetDecl());
     a.target.name = usingShadowDecl->getTargetDecl()->getQualifiedNameAsString();
-  } else if(auto typeAliasDecl = llvm::dyn_cast<clang::TypeAliasDecl>(res)) {
+  } else if(auto typeAliasDecl = llvm::dyn_cast<clang::TypedefNameDecl>(res)) {
     std::string result;
     llvm::raw_string_ostream stream(result);
-    clang::PrintingPolicy pp(res->getASTContext().getLangOpts());
     typeAliasDecl->getUnderlyingType().print(stream, pp);
     stream.flush();
     spdlog::debug(" + Underlying: {}", result);
@@ -370,7 +415,7 @@ void hdoc::indexer::matchers::RecordMatcher::run(const clang::ast_matchers::Matc
       // add aliases
       const clang::NamedDecl* alias = llvm::dyn_cast<clang::UsingShadowDecl>(d);
       if (!alias) alias = llvm::dyn_cast<clang::UsingDecl>(d);
-      if (!alias) alias = llvm::dyn_cast<clang::TypeAliasDecl>(d);
+      if (!alias) alias = llvm::dyn_cast<clang::TypedefNameDecl>(d);
       if (alias == nullptr || alias->isImplicit() ||
           isInIgnoreList(alias, this->cfg) || isInAnonymousNamespace(alias) ||
           (alias->getAccess() == clang::AS_private && cfg->ignorePrivateMembers == true)) {
@@ -403,40 +448,7 @@ void hdoc::indexer::matchers::RecordMatcher::run(const clang::ast_matchers::Matc
 
   // Get full declaration including templates
   clang::PrintingPolicy pp(res->getASTContext().getLangOpts());
-  // Rather than dealing independently with ClassTemplateDecl and ClassTemplatePartialSpecializationDecl,
-  // we can ask the generic Decl for the "described Template Params", which is exactly what we want
-  const auto* describedTemplateParms = res->getDescribedTemplateParams();
-  if (describedTemplateParms) {
-    for (const auto* paramDecl : describedTemplateParms->asArray()) {
-      hdoc::types::TemplateParam tparam;
-      if (const auto& templateType = llvm::dyn_cast<clang::TemplateTypeParmDecl>(paramDecl)) {
-        tparam.templateType    = hdoc::types::TemplateParam::TemplateType::TemplateTypeParameter;
-        tparam.isTypename      = templateType->wasDeclaredWithTypename();
-        tparam.isParameterPack = templateType->isParameterPack();
-        tparam.name            = templateType->getNameAsString();
-        // Get default argument if it exists
-        tparam.defaultValue =
-            templateType->hasDefaultArgument() ? templateType->getDefaultArgument().getAsString(pp) : "";
-      } else if (const auto* nonTypeTemplate = llvm::dyn_cast<clang::NonTypeTemplateParmDecl>(paramDecl)) {
-        tparam.templateType    = hdoc::types::TemplateParam::TemplateType::NonTypeTemplate;
-        tparam.type            = nonTypeTemplate->getType().getAsString(pp);
-        tparam.isParameterPack = nonTypeTemplate->isParameterPack();
-        tparam.name            = nonTypeTemplate->getNameAsString();
-        // Get default argument if it exists
-        tparam.defaultValue =
-            nonTypeTemplate->hasDefaultArgument() ? exprToString(nonTypeTemplate->getDefaultArgument(), pp) : "";
-      } else if (const auto* templateTemplateType = llvm::dyn_cast<clang::TemplateTemplateParmDecl>(paramDecl)) {
-        tparam.templateType = hdoc::types::TemplateParam::TemplateType::TemplateTemplateType;
-        tparam.type =
-            clang::Lexer::getSourceText(clang::CharSourceRange::getCharRange(templateTemplateType->getSourceRange()),
-                                        res->getASTContext().getSourceManager(),
-                                        res->getASTContext().getLangOpts());
-        tparam.name            = templateTemplateType->getNameAsString();
-        tparam.isParameterPack = templateTemplateType->isParameterPack() ? "..." : ""; // What? TODO: investigate
-      }
-      c.templateParams.emplace_back(tparam);
-    }
-  }
+  c.templateParams = collectTemplateParams(res, pp);
 
   // For template specializations, include the template arguments in the name
   // We do this after the template handling above, so we can re-use the TemplateTypeParm names 
