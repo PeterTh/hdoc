@@ -223,6 +223,7 @@ std::string getFunctionSignature(hdoc::types::FunctionSymbol& f) {
 
   // Various qualifiers
   signature += f.isNoDiscard ? "[[nodiscard]] " : "";
+  signature += f.isHiddenFriend ? "friend " : "";
   signature += f.storageClass == clang::SC_Static ? "static " : "";
   signature += f.storageClass == clang::SC_Extern ? "extern " : "";
   signature += f.isExplicit ? "explicit " : "";

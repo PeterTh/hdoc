@@ -574,7 +574,7 @@ void hdoc::serde::HTMLWriter::printFunctions() const {
   CTML::Node ul("ul");
   for (const auto& id : getSortedIDs(map2vec(this->index->functions), this->index->functions)) {
     const auto& f = this->index->functions.entries.at(id);
-    if (f.isRecordMember) {
+    if (f.isRecordMember || f.isHiddenFriend) {
       continue;
     }
     numFunctions += 1;
@@ -831,6 +831,37 @@ printInheritedMethods(const hdoc::types::Index* index, const hdoc::types::Record
   }
 }
 
+static CTML::Node printFunctionOverview(const std::vector<hdoc::types::SymbolID>& ids,
+                                        const hdoc::types::Index&                 index) {
+  CTML::Node ul("ul");
+  for (auto fnID : ids) {
+    const hdoc::types::FunctionSymbol m = index.functions.entries.at(fnID);
+
+    // Divide up the full function declaration so its name can be bold in the HTML
+    // and to reformat it for the overview list with trailing return type
+    const uint64_t    nameLen      = m.name.size();
+    const std::string templatePart = m.proto.substr(0, m.postTemplate);
+    std::string       retTypePart  = m.proto.substr(m.postTemplate, m.nameStart - m.postTemplate);
+    const std::string inlineMarker = "inline";
+    if (retTypePart.starts_with(inlineMarker)) {
+      retTypePart = retTypePart.substr(inlineMarker.size());
+    }
+    hdoc::utils::trim(retTypePart);
+    const std::string postName = m.proto.substr(m.nameStart + nameLen, m.proto.size() - m.nameStart - nameLen);
+
+    auto li = CTML::Node("li.is-family-code");
+    if (!templatePart.empty())
+      li.AddChild(CTML::Node("span.hdoc-overview-template", templatePart)).AppendRawHTML("<br>");
+    li.AddChild(CTML::Node("a").SetAttr("href", "#" + m.ID.str()).AddChild(CTML::Node("b", m.name)));
+    li.AppendText(postName);
+    if (!retTypePart.empty()) li.AppendRawHTML(" &rarr; ").AppendText(retTypePart);
+    if (m.access == clang::AS_private) li.ToggleClass("hdoc-private");
+    if (m.access == clang::AS_protected) li.ToggleClass("hdoc-protected");
+    ul.AddChild(li);
+  }
+  return ul;
+}
+
 /// Print a record to main
 void hdoc::serde::HTMLWriter::printRecord(const hdoc::types::RecordSymbol& c) const {
   CTML::Node main("main");
@@ -931,32 +962,7 @@ void hdoc::serde::HTMLWriter::printRecord(const hdoc::types::RecordSymbol& c) co
   if (sortedMethodIDs.size() > 0) {
     main.AddChild(CTML::Node("h2", "Member Function Overview"));
     hasMethodOverviewHeading = true;
-    CTML::Node ul("ul");
-    for (auto methodID : sortedMethodIDs) {
-      const hdoc::types::FunctionSymbol m = this->index->functions.entries.at(methodID);
-
-      // Divide up the full function declaration so its name can be bold in the HTML
-      // and to reformat it for the overview list with trailing return type
-      const uint64_t    nameLen  = m.name.size();
-      const std::string templatePart = m.proto.substr(0, m.postTemplate);
-      std::string retTypePart  = m.proto.substr(m.postTemplate, m.nameStart - m.postTemplate);
-      const std::string inlineMarker = "inline";
-      if(retTypePart.starts_with(inlineMarker)) {
-        retTypePart = retTypePart.substr(inlineMarker.size());
-      }
-      hdoc::utils::trim(retTypePart);
-      const std::string postName = m.proto.substr(m.nameStart + nameLen, m.proto.size() - m.nameStart - nameLen);
-
-      auto li = CTML::Node("li.is-family-code");
-      if(!templatePart.empty()) li.AddChild(CTML::Node("span.hdoc-overview-template", templatePart)).AppendRawHTML("<br>");
-      li.AddChild(CTML::Node("a").SetAttr("href", "#" + m.ID.str()).AddChild(CTML::Node("b", m.name)));
-      li.AppendText(postName);
-      if(!retTypePart.empty()) li.AppendRawHTML(" &rarr; ").AppendText(retTypePart);
-      if(m.access == clang::AS_private) li.ToggleClass("hdoc-private");
-      if(m.access == clang::AS_protected) li.ToggleClass("hdoc-protected");
-      ul.AddChild(li);
-    }
-    main.AddChild(ul);
+    main.AddChild(printFunctionOverview(sortedMethodIDs, *this->index));
   }
 
   // Add inherited methods to the list
@@ -967,6 +973,13 @@ void hdoc::serde::HTMLWriter::printRecord(const hdoc::types::RecordSymbol& c) co
       hasMethodOverviewHeading = true;
     }
     printInheritedMethods(this->index, ic, main);
+  }
+
+  // Hidden-friend function overview in list form
+  const auto& sortedHiddenFriendIDs = getSortedIDs(c.hiddenFriendIDs, this->index->functions);
+  if (sortedHiddenFriendIDs.size() > 0) {
+    main.AddChild(CTML::Node("h2", "Friend Function Overview"));
+    main.AddChild(printFunctionOverview(sortedHiddenFriendIDs, *this->index));
   }
 
   // List of methods with full information
@@ -980,6 +993,15 @@ void hdoc::serde::HTMLWriter::printRecord(const hdoc::types::RecordSymbol& c) co
       }
       printFunction(
           this->index->functions.entries.at(methodID), main, this->cfg->gitRepoURL, this->cfg->gitDefaultBranch);
+    }
+  }
+
+  // List hidden friend functions with full information
+  if (sortedHiddenFriendIDs.size() > 0) {
+    main.AddChild(CTML::Node("h2", "Friend Functions"));
+    for (const auto& friendID : sortedHiddenFriendIDs) {
+      printFunction(
+          this->index->functions.entries.at(friendID), main, this->cfg->gitRepoURL, this->cfg->gitDefaultBranch);
     }
   }
 
@@ -1210,10 +1232,11 @@ We have left the Javascript code unminified so that you are able to inspect it y
     for (const auto& s : this->index->functions.entries)
       json.object([&] {
         auto& f = s.second;
-        json.attribute("sid", f.isRecordMember ? f.parentNamespaceID.str() + ".html#" + f.ID.str() : f.ID.str());
+        const auto listAsMember = f.isRecordMember || f.isHiddenFriend;
+        json.attribute("sid", listAsMember ? f.parentNamespaceID.str() + ".html#" + f.ID.str() : f.ID.str());
         json.attribute("name", f.name);
         json.attribute("decl", f.proto);
-        json.attribute("type", f.isRecordMember ? 0 : 1);
+        json.attribute("type", listAsMember ? 0 : 1);
       });
 
     for (const auto& s : this->index->records.entries) {

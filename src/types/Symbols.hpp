@@ -156,13 +156,14 @@ struct RecordSymbol : public Symbol {
     std::string            name;   ///< Name of the record, used only for base records in std:: which aren't indexed
   };
 
-  std::string                        type;           ///< i.e. struct/class/union
-  std::string                        proto;          ///< Full class prototype, including
-  std::vector<MemberVariable>        vars;           ///< All of this record's member variables
-  std::vector<hdoc::types::SymbolID> methodIDs;      ///< All of this record's methods
-  std::vector<BaseRecord>            baseRecords;    ///< All of the records this record inherits from
-  std::vector<TemplateParam>         templateParams; ///< All of the template parameters for this record
-  std::vector<hdoc::types::SymbolID> aliasIDs;       ///< All of the aliases in this record
+  std::string                        type;            ///< i.e. struct/class/union
+  std::string                        proto;           ///< Full class prototype, including
+  std::vector<MemberVariable>        vars;            ///< All of this record's member variables
+  std::vector<hdoc::types::SymbolID> methodIDs;       ///< All of this record's methods
+  std::vector<BaseRecord>            baseRecords;     ///< All of the records this record inherits from
+  std::vector<TemplateParam>         templateParams;  ///< All of the template parameters for this record
+  std::vector<hdoc::types::SymbolID> aliasIDs;        ///< All of the aliases in this record
+  std::vector<hdoc::types::SymbolID> hiddenFriendIDs; ///< All functions  declared as hidden friends of this record
 
   virtual const std::string directory() const override {
     return "records";
@@ -181,6 +182,7 @@ struct FunctionParam {
 struct FunctionSymbol : public Symbol {
 public:
   bool                       isRecordMember    = false; ///< Is it a method?
+  bool                       isHiddenFriend    = false; ///< is hidden friend (friend with function body)?
   bool                       isConstexpr       = false; ///< Is it marked constexpr?
   bool                       isConsteval       = false; ///< Is it marked consteval?
   bool                       isExplicit        = false; ///< Is it marked explicit?

@@ -108,6 +108,13 @@ static std::vector<hdoc::types::TemplateParam> collectTemplateParams(const clang
   return templateParams;
 }
 
+static bool isHiddenFriendFunction(const clang::Decl* res) {
+  // Note that unlike other friend declarations, hidden friends have a body attached (see last condition) 
+  return res != nullptr && (llvm::isa<clang::FunctionDecl>(res) || llvm::isa<clang::FunctionTemplateDecl>(res)) &&
+         res->isCanonicalDecl() && res->getLexicalDeclContext()->getDeclKind() == clang::Decl::Kind::CXXRecord &&
+         res->getDeclContext()->getDeclKind() == clang::Decl::Kind::Namespace && res->getBody() != nullptr;
+}
+
 void hdoc::indexer::matchers::FunctionMatcher::run(const clang::ast_matchers::MatchFinder::MatchResult& Result) {
   const auto res = Result.Nodes.getNodeAs<clang::FunctionDecl>("function");
 
@@ -226,8 +233,10 @@ void hdoc::indexer::matchers::FunctionMatcher::run(const clang::ast_matchers::Ma
     // simplify name of the constructors to remove template arguments in case it is a specialization
     f.name = std::regex_replace(f.name, std::regex("<.*>"), "");
   }
-  f.proto          = getFunctionSignature(f);
   f.isRecordMember = res->isCXXClassMember();
+  f.isHiddenFriend = isHiddenFriendFunction(res);
+
+  f.proto          = getFunctionSignature(f);
 
   fillNamespace(f, res, this->cfg);
   this->index->functions.update(f.ID, f);
@@ -432,6 +441,12 @@ void hdoc::indexer::matchers::RecordMatcher::run(const clang::ast_matchers::Matc
         continue;
       }
       c.methodIDs.emplace_back(buildID(ftd));
+    } else if (const auto* fd = llvm::dyn_cast<clang::FriendDecl>(d)) {
+      if (const auto namedFriend = fd->getFriendDecl(); isHiddenFriendFunction(namedFriend)) {
+        c.hiddenFriendIDs.emplace_back(buildID(namedFriend));
+        spdlog::debug(
+            "Added hidden friend {} of {}", namedFriend->getQualifiedNameAsString(), res->getQualifiedNameAsString());
+      }
     } else {
       // add aliases
       const clang::NamedDecl* alias = llvm::dyn_cast<clang::UsingShadowDecl>(d);

@@ -20,6 +20,7 @@ We are happy to integrate useful PRs, but we don't currently have the bandwidth 
  * Support **markdown syntax** in doc comments
  * Document **aliases (i.e. usings)**, both at top level namespaces and in records
  * Correctly resolve file locations for **symbols defined in macros** (and therefore include them in the docs)
+ * Attach hidden friend functions to their associated records
  * Allow defining symbols as part of a "detail" set based on a list of namespace (sub-)strings; this set can be styled differently 
  * Allow ignoring symbols on namespace basis (in addition to file path)
  * Include operators in documentation and format them properly
