@@ -57,14 +57,14 @@ struct SymbolID {
 
 /// @brief Base class for all other types of symbols
 struct Symbol {
-  std::string           name = "";              ///< Function name, record name, enum name etc.
-  std::string           briefComment = "";      ///< Text following @brief or \brief command
-  std::string           docComment = "";        ///< All other Doxygen text attached to this symbol's documentation
-  hdoc::types::SymbolID ID;                     ///< Unique identifier for this Symbol
-  std::string           file = "";              ///< File where this Symbol is declared, relative to source root
-  std::uint64_t         line = 0;               ///< Line number in the file
-  hdoc::types::SymbolID parentNamespaceID;      ///< ID of the parent namespace (or record)
-  bool                  isDetail = false;       ///< Is this symbol in a "detail" namespace?
+  std::string           name         = ""; ///< Function name, record name, enum name etc.
+  std::string           briefComment = ""; ///< Text following @brief or \brief command
+  std::string           docComment   = ""; ///< All other Doxygen text attached to this symbol's documentation
+  hdoc::types::SymbolID ID;                ///< Unique identifier for this Symbol
+  std::string           file = "";         ///< File where this Symbol is declared, relative to source root
+  std::uint64_t         line = 0;          ///< Line number in the file
+  hdoc::types::SymbolID parentNamespaceID; ///< ID of the parent namespace (or record)
+  bool                  isDetail = false;  ///< Is this symbol in a "detail" namespace?
 
   /// @brief Comparison operator sorts alphabetically by symbol name, sort detail symbols last
   bool operator<(const Symbol& s) const {
@@ -104,9 +104,9 @@ struct TemplateParam {
 /// @brief Represents a using declaration or similar alias
 struct AliasSymbol : public Symbol {
 public:
-  TypeRef target;                                    ///< The type this using declaration aliases
-  bool isRecordMember = false;                       ///< Is it a member alias?
-  clang::AccessSpecifier access = clang::AS_private; ///< Access type, i.e. public/protected/private
+  TypeRef                target;                             ///< The type this using declaration aliases
+  bool                   isRecordMember = false;             ///< Is it a member alias?
+  clang::AccessSpecifier access         = clang::AS_private; ///< Access type, i.e. public/protected/private
 
   std::string url() const {
     return "a" + this->ID.str() + ".html";
@@ -132,13 +132,14 @@ struct RecordSymbol : public Symbol {
     std::string            name;   ///< Name of the record, used only for base records in std:: which aren't indexed
   };
 
-  std::string                        type;           ///< i.e. struct/class/union
-  std::string                        proto;          ///< Full class prototype, including
-  std::vector<MemberVariable>        vars;           ///< All of this record's member variables
-  std::vector<hdoc::types::SymbolID> methodIDs;      ///< All of this record's methods
-  std::vector<BaseRecord>            baseRecords;    ///< All of the records this record inherits from
-  std::vector<TemplateParam>         templateParams; ///< All of the template parameters for this record
-  std::vector<hdoc::types::SymbolID> aliasIDs;       ///< All of the aliases in this record
+  std::string                        type;            ///< i.e. struct/class/union
+  std::string                        proto;           ///< Full class prototype, including
+  std::vector<MemberVariable>        vars;            ///< All of this record's member variables
+  std::vector<hdoc::types::SymbolID> methodIDs;       ///< All of this record's methods
+  std::vector<BaseRecord>            baseRecords;     ///< All of the records this record inherits from
+  std::vector<TemplateParam>         templateParams;  ///< All of the template parameters for this record
+  std::vector<hdoc::types::SymbolID> aliasIDs;        ///< All of the aliases in this record
+  std::vector<hdoc::types::SymbolID> hiddenFriendIDs; ///< All functions  declared as hidden friends of this record
 
   std::string url() const {
     return "r" + this->ID.str() + ".html";
@@ -157,6 +158,7 @@ struct FunctionParam {
 struct FunctionSymbol : public Symbol {
 public:
   bool                       isRecordMember    = false; ///< Is it a method?
+  bool                       isHiddenFriend    = false; ///< is hidden friend (friend with function body)?
   bool                       isConstexpr       = false; ///< Is it marked constexpr?
   bool                       isConsteval       = false; ///< Is it marked consteval?
   bool                       isInline          = false; ///< Is it marked inline?

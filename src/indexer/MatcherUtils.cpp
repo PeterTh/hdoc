@@ -215,6 +215,7 @@ std::string getFunctionSignature(hdoc::types::FunctionSymbol& f) {
   f.postTemplate = signature.size();
 
   // Various qualifiers
+  signature += f.isHiddenFriend ? "friend " : "";
   signature += f.storageClass == clang::SC_Static ? "static " : "";
   signature += f.storageClass == clang::SC_Extern ? "extern " : "";
   signature += f.isInline ? "inline " : "";
