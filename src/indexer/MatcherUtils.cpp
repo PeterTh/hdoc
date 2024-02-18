@@ -153,12 +153,12 @@ bool isInAnonymousNamespace(const clang::Decl* d) {
   return false;
 }
 
-std::string getRecordProto(const hdoc::types::RecordSymbol& c) {
+static std::string getTemplateParamProto(const std::vector<hdoc::types::TemplateParam>& templateParams) {
   std::string proto;
-  if (c.templateParams.size() > 0) {
-    std::size_t count = 0;
+  std::size_t count = 0;
+  if (templateParams.size() > 0) {
     proto += "template <";
-    for (const auto& tparam : c.templateParams) {
+    for (const auto& tparam : templateParams) {
       if (count > 0) {
         proto += ", ";
       }
@@ -183,8 +183,15 @@ std::string getRecordProto(const hdoc::types::RecordSymbol& c) {
     }
     proto += "> ";
   }
-  proto += c.type + " " + c.name;
   return proto;
+}
+
+std::string getRecordProto(const hdoc::types::RecordSymbol& c) {
+  return getTemplateParamProto(c.templateParams) + c.type + " " + c.name;
+}
+
+std::string getTypeAliasProto(const hdoc::types::AliasSymbol& a) {
+  return getTemplateParamProto(a.templateParams) + "using " + a.name;
 }
 
 std::string getFunctionSignature(hdoc::types::FunctionSymbol& f) {

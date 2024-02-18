@@ -32,6 +32,9 @@ std::string getFunctionSignature(hdoc::types::FunctionSymbol& f);
 /// @brief Get the full prototype for a record, including templates.
 std::string getRecordProto(const hdoc::types::RecordSymbol& c);
 
+/// @brief Get the full "prototype" for a using-declaration or typedef, including templates.
+std::string getTypeAliasProto(const hdoc::types::AliasSymbol& a);
+
 /// @brief Convert a clang::Expr to a string, like clang::Decl->getNameAsString()
 std::string exprToString(const clang::Expr* expr, clang::PrintingPolicy printingPolicy);
 
