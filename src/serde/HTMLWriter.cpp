@@ -977,7 +977,11 @@ static CTML::Node printNamespace(const hdoc::types::NamespaceSymbol& ns, const h
     return CTML::Node("");
   }
 
-  auto node  = CTML::Node("li.is-family-code#" + ns.ID.str(), ns.name);
+  auto enclosingDetails = CTML::Node("details");
+  enclosingDetails.AddChild(CTML::Node("summary.is-family-code#" + ns.ID.str(), ns.name));
+  if(!ns.isDetail) {
+    enclosingDetails.SetAttr("open", "true");
+  }
   auto subUL = CTML::Node("ul");
 
   const std::vector<hdoc::types::SymbolID> childNamespaces = getSortedIDs(ns.namespaces, index.namespaces);
@@ -1016,7 +1020,7 @@ static CTML::Node printNamespace(const hdoc::types::NamespaceSymbol& ns, const h
     subUL.AddChild(
         CTML::Node("li.is-family-code").AddChild(CTML::Node("a", "using " + s.name).SetAttr("href", s.url())));
   }
-  return node.AddChild(subUL);
+  return enclosingDetails.AddChild(subUL);
 }
 
 /// Print all of the namespaces in a project in a nice tree-view

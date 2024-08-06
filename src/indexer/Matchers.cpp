@@ -14,6 +14,11 @@
 
 bool hdoc::indexer::matchers::utils::isEnclosingNamespaceInList(const clang::Decl* decl, const std::vector<std::string>& list) {
   auto* parent = decl->getDeclContext();
+  // The namespace itself counts as its own parent
+  // This makes e.g. detail namespaces themselves also be considered detail
+  if (auto* namespaceDecl = llvm::dyn_cast<clang::NamespaceDecl>(decl)) {
+    parent = namespaceDecl;
+  }
   while (parent) {
     if (auto* namespaceDecl = llvm::dyn_cast<clang::NamespaceDecl>(parent)) {
       if (namespaceDecl->isAnonymousNamespace()) {

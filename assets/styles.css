@@ -2486,12 +2486,14 @@ fieldset[disabled] .button {
 
 .content ul {
     list-style: disc outside;
-    margin-top: 1em
 }
 
 .content ul ul {
     list-style-type: circle;
-    margin-top: .5em
+}
+
+details {
+    margin-bottom: 2pt;
 }
 
 .content ul ul ul {
