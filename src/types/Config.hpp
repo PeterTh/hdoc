@@ -39,6 +39,7 @@ struct Config {
   bool                     ignorePrivateMembers = false; ///< Should private members of records be ignored?
   std::filesystem::path    homepage;                     ///< Path to "homepage" markdown file
   std::vector<std::filesystem::path> mdPaths;            ///< Paths to markdown pages
+  bool                     minimalOutput = false;        ///< Should the output be minimal? I.e. no sidebar, header etc, just the main content
 
   uint32_t debugLimitNumIndexedFiles;    ///< Limit the number of files to index (0 == index all files)
   bool     debugDumpJSONPayload = false; ///< Dump JSON payload to current working directory

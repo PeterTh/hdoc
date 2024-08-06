@@ -246,6 +246,11 @@ hdoc::frontend::Frontend::Frontend(int argc, char** argv, hdoc::types::Config* c
     cfg->ignorePrivateMembers = ignorePrivateMembers->get();
   }
 
+  if (const toml::value<bool>* minimalOutput = toml["output"]["minimal"].as_boolean()) {
+    cfg->minimalOutput = minimalOutput->get();
+    spdlog::info("Minimal output enabled.");
+  }
+
   if (const toml::value<bool>* debugDumpJSONPayload = toml["debug"]["dump_json_payload"].as_boolean()) {
     cfg->debugDumpJSONPayload = debugDumpJSONPayload->get();
   }

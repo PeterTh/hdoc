@@ -17,6 +17,8 @@ We are happy to integrate useful PRs, but we don't currently have the bandwidth 
  * Allow ignoring symbols on namespace basis (in addition to file path)
  * Include operators in documentation and format them properly
  * Various improvements to presentation, especially in the presence of complex member function signatures
+ * Optionally generate "minimal" output for better integration into existing websites / documentation
+ * More structured folder approach for output files
  * Builds with Clang/LLVM 17
 
 ### Broken/unmaintained features compared to hdoc

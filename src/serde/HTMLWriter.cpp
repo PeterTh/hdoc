@@ -117,115 +117,137 @@ std::string escapeForHTML(const std::string& in) {
   return str;
 }
 
+template<typename SymbolType>
+std::string entryPageUrl(bool topLevel) {
+  const std::string suffix = "/index.html";
+  const std::string prefix = topLevel ? "" : "../";
+  return prefix + SymbolType().directory() + suffix;
+}
+
+void appendEntryPageLinks(CTML::Node& node, bool topLevel) {
+  node.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Namespaces").SetAttr("href", entryPageUrl<hdoc::types::NamespaceSymbol>(topLevel))));
+  node.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Records").SetAttr("href", entryPageUrl<hdoc::types::RecordSymbol>(topLevel))));
+  node.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Enums").SetAttr("href", entryPageUrl<hdoc::types::EnumSymbol>(topLevel))));
+  node.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Functions").SetAttr("href", entryPageUrl<hdoc::types::FunctionSymbol>(topLevel))));
+  node.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Aliases").SetAttr("href", entryPageUrl<hdoc::types::AliasSymbol>(topLevel))));
+}
+
 /// Create a new HTML page with standard structure
 /// Optional sidebar, CSS styling, favicons, footer, etc.
 static void printNewPage(const hdoc::types::Config&   cfg,
                          CTML::Node                   main,
                          const std::filesystem::path& path,
                          const std::string_view       pageTitle,
-                         CTML::Node                   breadcrumbs = CTML::Node()) {
+                         CTML::Node                   breadcrumbs = CTML::Node(),
+                         bool topLevel = false) {
   CTML::Document html;
 
-  // Create the header, which includes Bulma CSS framework
-  html.AppendNodeToHead(CTML::Node("meta").SetAttr("charset", "utf-8"));
-  html.AppendNodeToHead(
-      CTML::Node("meta").SetAttr("name", "viewport").SetAttr("content", "width=device-width, initial-scale=1"));
-  html.AppendNodeToHead(CTML::Node("title", std::string(pageTitle)));
+  // create path directories if they don't exist
+  std::filesystem::create_directories(path.parent_path());
 
-  // Use our custom css which is a modified version of bulma
-  html.AppendNodeToHead(CTML::Node("link").SetAttr("rel", "stylesheet").SetAttr("href", "styles.css"));
+  if(!cfg.minimalOutput) {
 
-  // highlight.js scripts
-  html.AppendNodeToHead(CTML::Node("script").SetAttr("src", "highlight.min.js"));
-  html.AppendNodeToHead(CTML::Node("script", "hljs.highlightAll();"));
+    std::string dirPrefix = topLevel ? "" : "../";
 
-  // KaTeX configuration
-  html.AppendNodeToHead(CTML::Node("link").SetAttr("rel", "stylesheet").SetAttr("href", "katex.min.css"));
-  html.AppendNodeToHead(CTML::Node("script").SetAttr("src", "katex.min.js"));
-  html.AppendNodeToHead(CTML::Node("script").SetAttr("src", "auto-render.min.js"));
-  const char* katexConfiguration = R"(
-    document.addEventListener("DOMContentLoaded", function() {
-      renderMathInElement(document.body, {
-        delimiters: [
-          {left: '$$', right: '$$', display: true},
-          {left: '$', right: '$', display: false},
-        ],
+    // Create the header, which includes Bulma CSS framework
+    html.AppendNodeToHead(CTML::Node("meta").SetAttr("charset", "utf-8"));
+    html.AppendNodeToHead(
+        CTML::Node("meta").SetAttr("name", "viewport").SetAttr("content", "width=device-width, initial-scale=1"));
+    html.AppendNodeToHead(CTML::Node("title", std::string(pageTitle)));
+
+    // Use our custom css which is a modified version of bulma
+    html.AppendNodeToHead(CTML::Node("link").SetAttr("rel", "stylesheet").SetAttr("href", dirPrefix + "styles.css"));
+
+    // highlight.js scripts
+    html.AppendNodeToHead(CTML::Node("script").SetAttr("src", dirPrefix + "highlight.min.js"));
+    html.AppendNodeToHead(CTML::Node("script", "hljs.highlightAll();"));
+
+    // KaTeX configuration
+    html.AppendNodeToHead(CTML::Node("link").SetAttr("rel", "stylesheet").SetAttr("href", dirPrefix + "katex.min.css"));
+    html.AppendNodeToHead(CTML::Node("script").SetAttr("src", dirPrefix + "katex.min.js"));
+    html.AppendNodeToHead(CTML::Node("script").SetAttr("src", dirPrefix + "auto-render.min.js"));
+    const char* katexConfiguration = R"(
+      document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+          ],
+        });
       });
-    });
-  )";
-  html.AppendNodeToHead(CTML::Node("script").AppendRawHTML(katexConfiguration));
+    )";
+    html.AppendNodeToHead(CTML::Node("script").AppendRawHTML(katexConfiguration));
 
-  // Favicons
-  html.AppendNodeToHead(CTML::Node("link")
-                            .SetAttr("rel", "apple-touch-icon")
-                            .SetAttr("sizes", "180x180")
-                            .SetAttr("href", "apple-touch-icon.png"));
-  html.AppendNodeToHead(CTML::Node("link")
-                            .SetAttr("rel", "icon")
-                            .SetAttr("type", "image/png")
-                            .SetAttr("sizes", "32x32")
-                            .SetAttr("href", "favicon-32x32.png"));
-  html.AppendNodeToHead(CTML::Node("link")
-                            .SetAttr("rel", "icon")
-                            .SetAttr("type", "image/png")
-                            .SetAttr("sizes", "16x16")
-                            .SetAttr("href", "favicon-16x16.png"));
+    // Favicons
+    html.AppendNodeToHead(CTML::Node("link")
+                              .SetAttr("rel", "apple-touch-icon")
+                              .SetAttr("sizes", "180x180")
+                              .SetAttr("href", dirPrefix + "apple-touch-icon.png"));
+    html.AppendNodeToHead(CTML::Node("link")
+                              .SetAttr("rel", "icon")
+                              .SetAttr("type", "image/png")
+                              .SetAttr("sizes", "32x32")
+                              .SetAttr("href", dirPrefix + "favicon-32x32.png"));
+    html.AppendNodeToHead(CTML::Node("link")
+                              .SetAttr("rel", "icon")
+                              .SetAttr("type", "image/png")
+                              .SetAttr("sizes", "16x16")
+                              .SetAttr("href", dirPrefix + "favicon-16x16.png"));
 
-  CTML::Node wrapperDiv   = CTML::Node("div#wrapper");
-  CTML::Node section      = CTML::Node("section.section");
-  CTML::Node containerDiv = CTML::Node("div.container");
+    CTML::Node wrapperDiv   = CTML::Node("div#wrapper");
+    CTML::Node section      = CTML::Node("section.section");
+    CTML::Node containerDiv = CTML::Node("div.container");
 
-  // Create a sidebar with navigation links etc
-  auto columnsDiv = CTML::Node("div.columns");
-  auto mainColumn = CTML::Node("div.column").SetAttr("style", "overflow-x: auto");
-  auto aside      = CTML::Node("aside.column is-one-fifth");
-  auto menuUL     = CTML::Node("ul.menu-list");
+    // Create a sidebar with navigation links etc
+    auto columnsDiv = CTML::Node("div.columns");
+    auto mainColumn = CTML::Node("div.column").SetAttr("style", "overflow-x: auto");
+    auto aside      = CTML::Node("aside.column is-one-fifth");
+    auto menuUL     = CTML::Node("ul.menu-list");
 
-  menuUL.AddChild(CTML::Node("p.is-size-4", cfg.projectName + (cfg.projectVersion == "" ? "" : " " + cfg.projectVersion)));
-  menuUL.AddChild(CTML::Node("p.menu-label", "Navigation"));
-  menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Home").SetAttr("href", "index.html")));
-  menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Search").SetAttr("href", "search.html")));
-  if (cfg.gitRepoURL != "") {
-    menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Repository").SetAttr("href", cfg.gitRepoURL)));
-  }
-
-  // Add paths to markdown pages converted to HTML, if any were provided
-  if (cfg.mdPaths.size() > 0) {
-    menuUL.AddChild(CTML::Node("p.menu-label", "Pages"));
-    for (const auto& f : cfg.mdPaths) {
-      std::string path = "doc" + f.filename().replace_extension("html").string();
-      std::string name = f.filename().stem().string();
-      menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", name).SetAttr("href", path)));
+    menuUL.AddChild(CTML::Node("p.is-size-4", cfg.projectName + (cfg.projectVersion == "" ? "" : " " + cfg.projectVersion)));
+    menuUL.AddChild(CTML::Node("p.menu-label", "Navigation"));
+    menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Home").SetAttr("href", dirPrefix + "index.html")));
+    menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Search").SetAttr("href", dirPrefix + "search.html")));
+    if (cfg.gitRepoURL != "") {
+      menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Repository").SetAttr("href", cfg.gitRepoURL)));
     }
+
+    // Add paths to markdown pages converted to HTML, if any were provided
+    if (cfg.mdPaths.size() > 0) {
+      menuUL.AddChild(CTML::Node("p.menu-label", "Pages"));
+      for (const auto& f : cfg.mdPaths) {
+        std::string path = "doc" + f.filename().replace_extension("html").string();
+        std::string name = f.filename().stem().string();
+        menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", name).SetAttr("href", dirPrefix + path)));
+      }
+    }
+
+    // Add links to all of the standard sections
+    menuUL.AddChild(CTML::Node("p.menu-label", "API Documentation"));
+    appendEntryPageLinks(menuUL, topLevel);
+    aside.AddChild(menuUL);
+
+    columnsDiv.AddChild(aside);
+    columnsDiv.AddChild(mainColumn.AddChild(breadcrumbs).AddChild(main.SetAttr("class", "content")));
+    containerDiv.AddChild(columnsDiv);
+    section.AddChild(containerDiv);
+    wrapperDiv.AddChild(section);
+    html.AppendNodeToBody(wrapperDiv);
+
+    // Create footer with creation date and details
+    CTML::Node p1 = CTML::Node(
+        "p", "Documentation for " + cfg.projectName + (cfg.projectVersion == "" ? "." : " " + cfg.projectVersion + "."));
+    CTML::Node p2 = CTML::Node("p", "Generated by ")
+                        .AddChild(CTML::Node("a").SetAttr("href", "https://github.com/PeterTh/hdoc").AppendRawHTML("&#129388;doc"))
+                        .AppendText(" version " + cfg.hdocVersion + " on " + cfg.timestamp + ".");
+    CTML::Node p3 = CTML::Node("p.has-text-grey-light", "19AD43E11B2996");
+    html.AppendNodeToBody(CTML::Node("footer.footer").AddChild(p1).AddChild(p2).AddChild(p3));
+
+    // Dump to a file
+    std::ofstream(path) << html.ToString();
+  } else {
+    std::ofstream(path) << breadcrumbs.ToString() << std::endl << main.ToString();
   }
-
-  // Add links to all of the standard sections
-  menuUL.AddChild(CTML::Node("p.menu-label", "API Documentation"));
-  menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Namespaces").SetAttr("href", "namespaces.html")));
-  menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Records").SetAttr("href", "records.html")));
-  menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Enums").SetAttr("href", "enums.html")));
-  menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Functions").SetAttr("href", "functions.html")));
-  menuUL.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Aliases").SetAttr("href", "aliases.html")));
-  aside.AddChild(menuUL);
-
-  columnsDiv.AddChild(aside);
-  columnsDiv.AddChild(mainColumn.AddChild(breadcrumbs).AddChild(main.SetAttr("class", "content")));
-  containerDiv.AddChild(columnsDiv);
-  section.AddChild(containerDiv);
-  wrapperDiv.AddChild(section);
-  html.AppendNodeToBody(wrapperDiv);
-
-  // Create footer with creation date and details
-  CTML::Node p1 = CTML::Node(
-      "p", "Documentation for " + cfg.projectName + (cfg.projectVersion == "" ? "." : " " + cfg.projectVersion + "."));
-  CTML::Node p2 = CTML::Node("p", "Generated by ")
-                      .AddChild(CTML::Node("a").SetAttr("href", "https://github.com/PeterTh/hdoc").AppendRawHTML("&#129388;doc"))
-                      .AppendText(" version " + cfg.hdocVersion + " on " + cfg.timestamp + ".");
-  CTML::Node p3 = CTML::Node("p.has-text-grey-light", "19AD43E11B2996");
-  html.AppendNodeToBody(CTML::Node("footer.footer").AddChild(p1).AddChild(p2).AddChild(p3));
-
-  // Dump to a file
-  std::ofstream(path) << html.ToString();
 }
 
 /// Return a short string describing a symbol for its entry in the overview list
@@ -293,6 +315,10 @@ std::string hdoc::serde::getBareTypeName(const std::string_view typeName) {
   return str;
 }
 
+std::string getRecordUrl(const hdoc::types::SymbolID& id) {
+  return "../" + hdoc::types::RecordSymbol().directory() + "/" + id.str() + ".html";
+};
+
 /// Replaces type names in a function proto with hyperlinked references to
 /// those types. Works for indexed records and std:: types found in the map above.
 std::string hdoc::serde::getHyperlinkedFunctionProto(const std::string_view             proto,
@@ -304,7 +330,7 @@ std::string hdoc::serde::getHyperlinkedFunctionProto(const std::string_view     
   std::size_t index              = 0;
   std::string bareReturnTypeName = getBareTypeName(f.returnType.name);
   if (f.returnType.id.hashValue != 0) {
-    std::string replacement = "<a href=\"r" + f.returnType.id.str() + ".html\">" + bareReturnTypeName + "</a>";
+    std::string replacement = "<a href=\"" + getRecordUrl(f.returnType.id) + "\">" + bareReturnTypeName + "</a>";
     index                   = hdoc::utils::replaceFirst(str, bareReturnTypeName, replacement, index);
   }
 
@@ -319,7 +345,7 @@ std::string hdoc::serde::getHyperlinkedFunctionProto(const std::string_view     
   for (const auto& param : f.params) {
     std::string bareParamTypeName = getBareTypeName(param.type.name);
     if (param.type.id.hashValue != 0) {
-      std::string replacement = "<a href=\"r" + param.type.id.str() + ".html\">" + bareParamTypeName + "</a>";
+      std::string replacement = "<a href=\"" + getRecordUrl(param.type.id) + "\">" + bareParamTypeName + "</a>";
       index                   = hdoc::utils::replaceFirst(str, bareParamTypeName, replacement, index);
     }
 
@@ -361,7 +387,7 @@ static std::string getHyperlinkedTypeName(const hdoc::types::TypeRef& type) {
   }
   // The type is in the database, so we link to it.
   else {
-    std::string replacement = "<a href=\"r" + type.id.str() + ".html\">" + bareTypeName + "</a>";
+    std::string replacement = "<a href=\"" + getRecordUrl(type.id) + "\">" + bareTypeName + "</a>";
     hdoc::utils::replaceFirst(fullTypeName, bareTypeName, replacement);
     return fullTypeName;
   }
@@ -426,9 +452,9 @@ getBreadcrumbNode(const std::string& prefix, const hdoc::types::Symbol& s, const
     auto li = CTML::Node("li");
     auto a  = CTML::Node();
     if (parent.symbolType == "namespace") {
-      a = CTML::Node("a").SetAttr("href", "namespaces.html#" + parent.symbol.ID.str());
+      a = CTML::Node("a").SetAttr("href", entryPageUrl<hdoc::types::NamespaceSymbol>(false) + "#" + parent.symbol.ID.str());
     } else {
-      a = CTML::Node("a").SetAttr("href", "r" + parent.symbol.ID.str() + ".html");
+      a = CTML::Node("a").SetAttr("href", getRecordUrl(parent.symbol.ID));
     }
     auto span = CTML::Node("span", parent.symbolType + " " + parent.symbol.name);
 
@@ -544,7 +570,7 @@ void hdoc::serde::HTMLWriter::printFunctions() const {
     }
     numFunctions += 1;
     auto li = CTML::Node("li")
-                    .AddChild(CTML::Node("a.is-family-code", f.name).SetAttr("href", f.url()))
+                    .AddChild(CTML::Node("a.is-family-code", f.name).SetAttr("href", f.relativeUrl()))
                     .AppendText(getSymbolBlurb(f));
     if (f.isDetail) li.ToggleClass("hdoc-detail");
     ul.AddChild(li);
@@ -568,8 +594,10 @@ void hdoc::serde::HTMLWriter::printFunctions() const {
   } else {
     main.AddChild(ul);
   }
-  printNewPage(
-      *this->cfg, main, this->cfg->outputDir / "functions.html", "Functions: " + this->cfg->getPageTitleSuffix());
+  printNewPage(*this->cfg,
+               main,
+               this->cfg->outputDir / entryPageUrl<types::FunctionSymbol>(true),
+               "Functions: " + this->cfg->getPageTitleSuffix());
 }
 
 static std::string getAliasHTML(const hdoc::types::AliasSymbol& a) {
@@ -644,7 +672,7 @@ void hdoc::serde::HTMLWriter::printAliases() const {
     }
     numUsings += 1;
     auto li = CTML::Node("li")
-                    .AddChild(CTML::Node("a.is-family-code", u.name).SetAttr("href", u.url()))
+                    .AddChild(CTML::Node("a.is-family-code", u.name).SetAttr("href", u.relativeUrl()))
                     .AppendText(getSymbolBlurb(u));
     if (u.isDetail) li.ToggleClass("hdoc-detail");
     ul.AddChild(li);
@@ -668,8 +696,10 @@ void hdoc::serde::HTMLWriter::printAliases() const {
   } else {
     main.AddChild(ul);
   }
-  printNewPage(
-      *this->cfg, main, this->cfg->outputDir / "aliases.html", "Aliases: " + this->cfg->getPageTitleSuffix());
+  printNewPage(*this->cfg,
+               main,
+               this->cfg->outputDir / entryPageUrl<types::AliasSymbol>(true),
+               "Aliases: " + this->cfg->getPageTitleSuffix());
 }
 
 static std::vector<hdoc::types::RecordSymbol::BaseRecord> getInheritedSymbols(const hdoc::types::Index*        index,
@@ -731,7 +761,7 @@ static void printMemberVariables(const hdoc::types::RecordSymbol& c, CTML::Node&
     else {
       dt = CTML::Node("dt.is-family-code");
       const auto a =
-          CTML::Node("a", preamble).SetAttr("href", c.url() + "#var_" + var.name).AddChild(CTML::Node("b", var.name));
+          CTML::Node("a", preamble).SetAttr("href", c.relativeUrl() + "#var_" + var.name).AddChild(CTML::Node("b", var.name));
       dt.AddChild(a);
     }
     if (var.defaultValue != "") {
@@ -752,7 +782,7 @@ static void printMemberVariables(const hdoc::types::RecordSymbol& c, CTML::Node&
   if (numVars > 0) {
     if (isInherited) {
       main.AddChild(CTML::Node("p", "Inherited from ")
-                        .AddChild(CTML::Node("a", c.name).SetAttr("href", c.url()))
+                        .AddChild(CTML::Node("a", c.name).SetAttr("href", c.relativeUrl()))
                         .AppendText(":"));
     }
     main.AddChild(dl);
@@ -773,14 +803,14 @@ printInheritedMethods(const hdoc::types::Index* index, const hdoc::types::Record
 
     const auto li = CTML::Node("li.is-family-code")
                         .AddChild(CTML::Node("a", to_string(f.access) + " ")
-                                      .SetAttr("href", c.url() + "#" + f.ID.str())
+                                      .SetAttr("href", c.relativeUrl() + "#" + f.ID.str())
                                       .AddChild(CTML::Node("b", f.name)));
     ul.AddChild(li);
   }
 
   if (c.methodIDs.size() > 0) {
     main.AddChild(
-        CTML::Node("p", "Inherited from ").AddChild(CTML::Node("a", c.name).SetAttr("href", c.url())).AppendText(":"));
+        CTML::Node("p", "Inherited from ").AddChild(CTML::Node("a", c.name).SetAttr("href", c.relativeUrl())).AppendText(":"));
     main.AddChild(ul);
   }
 }
@@ -819,7 +849,7 @@ void hdoc::serde::HTMLWriter::printRecord(const hdoc::types::RecordSymbol& c) co
         baseP.AppendText(baseRecord.name);
       } else {
         const auto& p = this->index->records.entries.at(baseRecord.id);
-        baseP.AddChild(CTML::Node("a", p.name).SetAttr("href", p.url()));
+        baseP.AddChild(CTML::Node("a", p.name).SetAttr("href", p.relativeUrl()));
       }
       count++;
     }
@@ -952,7 +982,7 @@ void hdoc::serde::HTMLWriter::printRecords() const {
   for (const auto& id : getSortedIDs(map2vec(this->index->records), this->index->records)) {
     const auto& c = this->index->records.entries.at(id);
     auto li = CTML::Node("li")
-                    .AddChild(CTML::Node("a.is-family-code", c.type + " " + c.name).SetAttr("href", c.url()))
+                    .AddChild(CTML::Node("a.is-family-code", c.type + " " + c.name).SetAttr("href", c.relativeUrl()))
                     .AppendText(getSymbolBlurb(c));
     if (c.isDetail) li.ToggleClass("hdoc-detail");
     ul.AddChild(li);
@@ -965,7 +995,10 @@ void hdoc::serde::HTMLWriter::printRecords() const {
   } else {
     main.AddChild(ul);
   }
-  printNewPage(*this->cfg, main, this->cfg->outputDir / "records.html", "Records: " + this->cfg->getPageTitleSuffix());
+  printNewPage(*this->cfg,
+               main,
+               this->cfg->outputDir / entryPageUrl<types::RecordSymbol>(true),
+               "Records: " + this->cfg->getPageTitleSuffix());
 }
 
 /// Recursively print an single namespace and all of its children
@@ -1002,7 +1035,7 @@ static CTML::Node printNamespace(const hdoc::types::NamespaceSymbol& ns, const h
     }
     const hdoc::types::RecordSymbol s = index.records.entries.at(childID);
     subUL.AddChild(
-        CTML::Node("li.is-family-code").AddChild(CTML::Node("a", s.type + " " + s.name).SetAttr("href", s.url())));
+        CTML::Node("li.is-family-code").AddChild(CTML::Node("a", s.type + " " + s.name).SetAttr("href", s.relativeUrl())));
   }
   for (const auto& childID : childEnums) {
     if (index.enums.contains(childID == false)) {
@@ -1010,7 +1043,7 @@ static CTML::Node printNamespace(const hdoc::types::NamespaceSymbol& ns, const h
     }
     const hdoc::types::EnumSymbol s = index.enums.entries.at(childID);
     subUL.AddChild(
-        CTML::Node("li.is-family-code").AddChild(CTML::Node("a", s.type + " " + s.name).SetAttr("href", s.url())));
+        CTML::Node("li.is-family-code").AddChild(CTML::Node("a", s.type + " " + s.name).SetAttr("href", s.relativeUrl())));
   }
   for (const auto& childID : childAliases) {
     if (index.aliases.contains(childID == false)) {
@@ -1018,7 +1051,7 @@ static CTML::Node printNamespace(const hdoc::types::NamespaceSymbol& ns, const h
     }
     const hdoc::types::AliasSymbol s = index.aliases.entries.at(childID);
     subUL.AddChild(
-        CTML::Node("li.is-family-code").AddChild(CTML::Node("a", "using " + s.name).SetAttr("href", s.url())));
+        CTML::Node("li.is-family-code").AddChild(CTML::Node("a", "using " + s.name).SetAttr("href", s.relativeUrl())));
   }
   return enclosingDetails.AddChild(subUL);
 }
@@ -1043,8 +1076,10 @@ void hdoc::serde::HTMLWriter::printNamespaces() const {
   } else {
     main.AddChild(namespaceTree);
   }
-  printNewPage(
-      *this->cfg, main, this->cfg->outputDir / "namespaces.html", "Namespaces: " + this->cfg->getPageTitleSuffix());
+  printNewPage(*this->cfg,
+               main,
+               this->cfg->outputDir / entryPageUrl<types::NamespaceSymbol>(true),
+               "Namespaces: " + this->cfg->getPageTitleSuffix());
 }
 
 /// Print an enum to main
@@ -1100,7 +1135,7 @@ void hdoc::serde::HTMLWriter::printEnums() const {
   for (const auto& id : getSortedIDs(map2vec(this->index->enums), this->index->enums)) {
     const auto& e = this->index->enums.entries.at(id);
     auto li = CTML::Node("li")
-                    .AddChild(CTML::Node("a.is-family-code", e.type + " " + e.name).SetAttr("href", e.url()))
+                    .AddChild(CTML::Node("a.is-family-code", e.type + " " + e.name).SetAttr("href", e.relativeUrl()))
                     .AppendText(getSymbolBlurb(e));
     if (e.isDetail) li.ToggleClass("hdoc-detail");
     ul.AddChild(li);
@@ -1113,7 +1148,10 @@ void hdoc::serde::HTMLWriter::printEnums() const {
   } else {
     main.AddChild(ul);
   }
-  printNewPage(*this->cfg, main, this->cfg->outputDir / "enums.html", "Enums: " + this->cfg->getPageTitleSuffix());
+  printNewPage(*this->cfg,
+               main,
+               this->cfg->outputDir / entryPageUrl<types::EnumSymbol>(true),
+               "Enums: " + this->cfg->getPageTitleSuffix());
 }
 
 void hdoc::serde::HTMLWriter::printSearchPage() const {
@@ -1202,16 +1240,11 @@ void hdoc::serde::HTMLWriter::printProjectIndex() const {
   else {
     main.AddChild(CTML::Node("h1", this->cfg->getPageTitleSuffix()));
     CTML::Node ul("ul");
-
-    ul.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Records").SetAttr("href", "records.html")));
-    ul.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Aliases").SetAttr("href", "aliases.html")));
-    ul.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Functions").SetAttr("href", "functions.html")));
-    ul.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Enums").SetAttr("href", "enums.html")));
-    ul.AddChild(CTML::Node("li").AddChild(CTML::Node("a", "Namespaces").SetAttr("href", "namespaces.html")));
+    appendEntryPageLinks(ul, true);
     main.AddChild(ul);
   }
 
-  printNewPage(*this->cfg, main, this->cfg->outputDir / "index.html", this->cfg->getPageTitleSuffix());
+  printNewPage(*this->cfg, main, this->cfg->outputDir / "index.html", this->cfg->getPageTitleSuffix(), CTML::Node(), true);
 }
 
 void hdoc::serde::HTMLWriter::processMarkdownFiles() const {
@@ -1221,6 +1254,6 @@ void hdoc::serde::HTMLWriter::processMarkdownFiles() const {
     CTML::Node                     main      = converter.getHTMLNode();
     std::string                    filename  = "doc" + f.filename().replace_extension("html").string();
     std::string                    pageTitle = f.filename().stem().string();
-    printNewPage(*this->cfg, main, this->cfg->outputDir / filename, pageTitle);
+    printNewPage(*this->cfg, main, this->cfg->outputDir / filename, pageTitle, CTML::Node(), true);
   }
 }

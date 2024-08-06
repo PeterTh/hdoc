@@ -41,9 +41,11 @@ int main(int argc, char** argv) {
   htmlWriter.printRecords();
   htmlWriter.printNamespaces();
   htmlWriter.printEnums();
-  htmlWriter.printSearchPage();
-  htmlWriter.processMarkdownFiles();
-  htmlWriter.printProjectIndex();
+  if(cfg.minimalOutput == false) {
+    htmlWriter.printSearchPage();
+    htmlWriter.processMarkdownFiles();
+    htmlWriter.printProjectIndex();
+  }
 
   // Ensure that cfg was properly initialized
   if (cfg.debugDumpJSONPayload) {

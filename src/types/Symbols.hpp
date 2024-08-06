@@ -66,6 +66,8 @@ struct Symbol {
   hdoc::types::SymbolID parentNamespaceID; ///< ID of the parent namespace (or record)
   bool                  isDetail = false;  ///< Is this symbol in a "detail" namespace?
 
+  virtual ~Symbol() = default;
+
   /// @brief Comparison operator sorts alphabetically by symbol name, sort detail symbols last
   bool operator<(const Symbol& s) const {
     if (this->isDetail != s.isDetail) {
@@ -75,6 +77,18 @@ struct Symbol {
   }
 
   bool operator==(hdoc::types::Symbol const&) const = default;
+
+  virtual const std::string directory() const {
+    return "";
+  };
+
+  std::string url() const {
+    return directory() + "/" + this->ID.str() + ".html";
+  }
+
+  std::string relativeUrl() const {
+    return "../" + url();
+  }
 };
 
 /// @brief Represents a possible reference to another Symbol that may or may not be in the Index.
@@ -110,8 +124,8 @@ public:
   std::vector<TemplateParam> templateParams;                     ///< All of the template parameters for this alias
   std::string                proto;                              ///< Full "prototype", including template parameters
 
-  std::string url() const {
-    return "a" + this->ID.str() + ".html";
+  virtual const std::string directory() const override {
+    return "aliases";
   }
 };
 
@@ -142,8 +156,8 @@ struct RecordSymbol : public Symbol {
   std::vector<TemplateParam>         templateParams; ///< All of the template parameters for this record
   std::vector<hdoc::types::SymbolID> aliasIDs;       ///< All of the aliases in this record
 
-  std::string url() const {
-    return "r" + this->ID.str() + ".html";
+  virtual const std::string directory() const override {
+    return "records";
   }
 };
 
@@ -185,8 +199,8 @@ public:
   std::vector<FunctionParam> params;               ///< All of the template parameters for this function
   std::vector<TemplateParam> templateParams;       ///< All of the parameters for this function
 
-  std::string url() const {
-    return "f" + this->ID.str() + ".html";
+  virtual const std::string directory() const override {
+    return "functions";
   }
 };
 
@@ -203,8 +217,8 @@ public:
   std::string             type = ""; ///< "class" for enum class, "struct" for enum struct, otherwise ""
   std::vector<EnumMember> members;   ///< All of this enum's values
 
-  std::string url() const {
-    return "e" + this->ID.str() + ".html";
+  virtual const std::string directory() const override {
+    return "enums";
   }
 };
 
@@ -216,8 +230,8 @@ public:
   std::vector<hdoc::types::SymbolID> enums      = {}; ///< All of the enums in this namespace
   std::vector<hdoc::types::SymbolID> usings     = {}; ///< All of the usings in this namespace
 
-  std::string url() const {
-    return "n" + this->ID.str() + ".html";
+  virtual const std::string directory() const override {
+    return "namespaces";
   }
 };
 
