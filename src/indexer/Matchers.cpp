@@ -371,6 +371,11 @@ void hdoc::indexer::matchers::RecordMatcher::run(const clang::ast_matchers::Matc
     return;
   }
 
+  // Ignore records defined in function scope, those should always be implementation details
+  if (res->getDeclContext()->isFunctionOrMethod()) {
+    return;
+  }
+
   // Try to deduce name of structs/unions with C-style typedef decls
   // If the name is empty we try to find the name using some AST hackery, and save the name to be populated later
   std::string cachedName;

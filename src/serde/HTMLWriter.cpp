@@ -246,7 +246,16 @@ static void printNewPage(const hdoc::types::Config&   cfg,
     // Dump to a file
     std::ofstream(path) << html.ToString();
   } else {
-    std::ofstream(path) << breadcrumbs.ToString() << std::endl << main.ToString();
+    // prevent breadcrumbs from showing if they are empty
+    // (i.e. on top level pages or unsupported contexts - provide info in the latter case so that can be fixed)
+    std::string crumbsHTML = breadcrumbs.ToString();
+    if(crumbsHTML == "<></>") {
+      crumbsHTML = "";
+      if(!topLevel && path.filename() != "index.html") {
+        spdlog::warn("No breadcrumbs found for page '{}'", path.generic_string());
+      }
+    }
+    std::ofstream(path) << crumbsHTML << std::endl << main.ToString();
   }
 }
 
@@ -512,7 +521,7 @@ static void printFunction(const hdoc::types::FunctionSymbol& f,
     CTML::Node dl("dl");
 
     for (auto tparam : f.templateParams) {
-      auto dt = CTML::Node("dt.is-family-code").AppendRawHTML(tparam.type);
+      auto dt = CTML::Node("dt.is-family-code").AppendRawHTML(escapeForHTML(tparam.type));
       dt.AddChild(CTML::Node("b", " " + tparam.name));
 
       if (tparam.defaultValue != "") {
