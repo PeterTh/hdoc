@@ -338,20 +338,41 @@ std::string hdoc::serde::getBareTypeName(const std::string_view typeName) {
 std::string getRecordUrl(const hdoc::types::SymbolID& id) {
   return "../" + hdoc::types::RecordSymbol().directory() + "/" + id.str() + ".html";
 };
+std::string getEnumURL(const hdoc::types::SymbolID& id) {
+  return "../" + hdoc::types::EnumSymbol().directory() + "/" + id.str() + ".html";
+};
+std::string getAliasURL(const hdoc::types::SymbolID& id) {
+  return "../" + hdoc::types::AliasSymbol().directory() + "/" + id.str() + ".html";
+};
 
 /// Replaces type names in a function proto with hyperlinked references to
 /// those types. Works for indexed records and std:: types found in the map above.
-std::string hdoc::serde::getHyperlinkedFunctionProto(const std::string_view             proto,
-                                                     const hdoc::types::FunctionSymbol& f) {
+std::string hdoc::serde::HTMLWriter::getHyperlinkedFunctionProto(const std::string_view             proto,
+                                                                 const hdoc::types::FunctionSymbol& f) const {
   std::string str = std::string(proto);
 
   str = escapeForHTML(str);
 
+  auto getUrlForSymbol = [&](const hdoc::types::SymbolID& id) -> std::string {
+    if (index->records.contains(id)) {
+      return getRecordUrl(id);
+    } else if (index->enums.contains(id)) {
+      return getEnumURL(id);
+    } else if (index->aliases.contains(id)) {
+      return getAliasURL(id);
+    } else {
+      return "";
+    }
+  };
+
   std::size_t index              = 0;
   std::string bareReturnTypeName = getBareTypeName(f.returnType.name);
   if (f.returnType.id.hashValue != 0) {
-    std::string replacement = "<a href=\"" + getRecordUrl(f.returnType.id) + "\">" + bareReturnTypeName + "</a>";
-    index                   = hdoc::utils::replaceFirst(str, bareReturnTypeName, replacement, index);
+    std::string targetUrl = getUrlForSymbol(f.returnType.id);
+    if(targetUrl != "") {
+      std::string replacement = "<a href=\"" + targetUrl + "\">" + bareReturnTypeName + "</a>";
+      index                   = hdoc::utils::replaceFirst(str, bareReturnTypeName, replacement, index);
+    }
   }
 
   if (bareReturnTypeName.substr(0, 5) == "std::") {
@@ -365,8 +386,11 @@ std::string hdoc::serde::getHyperlinkedFunctionProto(const std::string_view     
   for (const auto& param : f.params) {
     std::string bareParamTypeName = getBareTypeName(param.type.name);
     if (param.type.id.hashValue != 0) {
-      std::string replacement = "<a href=\"" + getRecordUrl(param.type.id) + "\">" + bareParamTypeName + "</a>";
-      index                   = hdoc::utils::replaceFirst(str, bareParamTypeName, replacement, index);
+      std::string targetUrl = getUrlForSymbol(param.type.id);
+      if(targetUrl != "") {
+        std::string replacement = "<a href=\"" + targetUrl + "\">" + bareParamTypeName + "</a>";
+        index                   = hdoc::utils::replaceFirst(str, bareParamTypeName, replacement, index);
+      }
     }
 
     if (bareParamTypeName.substr(0, 5) == "std::") {
@@ -503,12 +527,12 @@ void appendAsMarkdown(const std::string comment, CTML::Node& node) {
 }
 
 /// Print a function to main
-static void printFunction(const hdoc::types::FunctionSymbol& f,
-                          CTML::Node&                        main,
-                          const std::string_view             gitRepoURL,
-                          const std::string_view             gitDefaultBranch) {
+void hdoc::serde::HTMLWriter::printFunction(const hdoc::types::FunctionSymbol& f,
+                                            CTML::Node&                        main,
+                                            const std::string_view             gitRepoURL,
+                                            const std::string_view             gitDefaultBranch) const {
   // Print function return type, name, and parameters as section header
-  std::string proto = hdoc::serde::getHyperlinkedFunctionProto(hdoc::serde::clangFormat(f.proto), f);
+  std::string proto = getHyperlinkedFunctionProto(hdoc::serde::clangFormat(f.proto), f);
   auto        inner = CTML::Node("code.hdoc-function-code.language-cpp").AppendRawHTML(proto);
   main.AddChild(CTML::Node("h3#" + f.ID.str())
                     .AddChild(CTML::Node("pre.p-0.hdoc-pre-parent")
