@@ -751,7 +751,13 @@ static void printMemberVariables(const hdoc::types::RecordSymbol& c, CTML::Node&
   CTML::Node dl("dl");
   uint64_t   numVars = 0;
 
-  for (const hdoc::types::MemberVariable& var : c.vars) {
+  // sort member variables by access level
+  std::vector<hdoc::types::MemberVariable> sortedVars = c.vars;
+  std::stable_sort(sortedVars.begin(), sortedVars.end(), [](const hdoc::types::MemberVariable& a, const hdoc::types::MemberVariable& b) {
+    return a.access < b.access;
+  });
+
+  for (const hdoc::types::MemberVariable& var : sortedVars) {
     if (isInherited == true && var.access == clang::AS_private) {
       continue;
     }

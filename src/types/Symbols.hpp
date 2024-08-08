@@ -127,6 +127,14 @@ public:
   virtual const std::string directory() const override {
     return "aliases";
   }
+
+  /// @brief Comparison operator sorts according to visibility, within same visibility fall back to default
+  bool operator<(const AliasSymbol& s) const {
+    if (this->access != s.access) {
+      return this->access < s.access;
+    }
+    return Symbol::operator<(s);
+  }
 };
 
 /// @brief Represents a member variable of a record
