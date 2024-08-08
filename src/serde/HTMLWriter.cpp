@@ -577,6 +577,11 @@ void hdoc::serde::HTMLWriter::printFunctions() const {
     if (f.isRecordMember || f.isHiddenFriend) {
       continue;
     }
+    if (index->records.contains(f.parentNamespaceID)) {
+      // this is a friend declaration, skip it (hidden friends are already in records,
+      //                                        and other friends also have a separate definition)
+      continue;
+    }
     numFunctions += 1;
     auto li = CTML::Node("li")
                     .AddChild(CTML::Node("a.is-family-code", f.name).SetAttr("href", f.relativeUrl()))
