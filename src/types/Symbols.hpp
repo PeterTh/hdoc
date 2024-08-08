@@ -202,6 +202,14 @@ public:
   virtual const std::string directory() const override {
     return "functions";
   }
+
+  /// @brief Comparison operator sorts according to visibility, within same visibility fall back to default
+  bool operator<(const FunctionSymbol& s) const {
+    if (this->access != s.access) {
+      return this->access < s.access;
+    }
+    return Symbol::operator<(s);
+  }
 };
 
 /// @brief Represents the values inside an enum
