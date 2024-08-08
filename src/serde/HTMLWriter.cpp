@@ -777,6 +777,7 @@ static void printMemberVariables(const hdoc::types::RecordSymbol& c, CTML::Node&
       dt.AppendText(" = " + var.defaultValue);
     }
 
+    if(var.access == clang::AS_protected) dt.ToggleClass("hdoc-protected");
     if(var.access == clang::AS_private) dt.ToggleClass("hdoc-private");
 
     dl.AddChild(dt);
@@ -912,6 +913,7 @@ void hdoc::serde::HTMLWriter::printRecord(const hdoc::types::RecordSymbol& c) co
       const auto& a = this->index->aliases.entries.at(aliasID);
       auto li = CTML::Node("li.is-family-code").AppendRawHTML(getAliasHTML(a));
       if(a.access == clang::AS_private) li.ToggleClass("hdoc-private");
+      if(a.access == clang::AS_protected) li.ToggleClass("hdoc-protected");
       ul.AddChild(li);
     }
     main.AddChild(ul);
@@ -945,6 +947,7 @@ void hdoc::serde::HTMLWriter::printRecord(const hdoc::types::RecordSymbol& c) co
       li.AppendText(postName);
       if(!retTypePart.empty()) li.AppendRawHTML(" &rarr; ").AppendText(retTypePart);
       if(m.access == clang::AS_private) li.ToggleClass("hdoc-private");
+      if(m.access == clang::AS_protected) li.ToggleClass("hdoc-protected");
       ul.AddChild(li);
     }
     main.AddChild(ul);
