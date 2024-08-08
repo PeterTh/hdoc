@@ -32,6 +32,7 @@ int main(int argc, char** argv) {
   indexer.resolveNamespaces();
   indexer.updateRecordNames();
   indexer.updateMemberFunctions();
+  indexer.resolveFunctionOverloads();
   indexer.printStats();
   const hdoc::types::Index* index = indexer.dump();
 

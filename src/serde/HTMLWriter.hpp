@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "ctml.hpp"
 #include "llvm/Support/ThreadPool.h"
 
 #include "types/Config.hpp"
@@ -36,6 +37,15 @@ private:
   const hdoc::types::Index*  index;
   const hdoc::types::Config* cfg;
   llvm::ThreadPool&          pool;
+
+  CTML::Node printNamespace(const hdoc::types::NamespaceSymbol& ns) const;
+
+  /// @brief Get a string representation of a namespace that can be used in a URL (i.e. replace '::' with '_')
+  std::string getNamespaceString(const hdoc::types::SymbolID& n) const;
+
+  // @brief Get the URL for a given symbol
+  std::string getFunctionURL(const hdoc::types::SymbolID& f, bool relative) const;
+  std::string getFunctionGroupURL(const hdoc::types::FreestandingFunctionID& f, bool relative) const;
 };
 std::string getHyperlinkedFunctionProto(const std::string_view proto, const hdoc::types::FunctionSymbol& f);
 std::string clangFormat(const std::string_view s, const uint64_t& columnLimit = 50);

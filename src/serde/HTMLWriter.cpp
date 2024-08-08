@@ -1,7 +1,6 @@
 // Copyright 2019-2023 hdoc
 // SPDX-License-Identifier: AGPL-3.0-only
 
-#include "ctml.hpp"
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/fmt.h"
 #include "clang/Basic/Specifiers.h"
@@ -289,6 +288,18 @@ static std::string getSymbolBlurb(const hdoc::types::Symbol& s) {
   }
 }
 
+// for freestanding function groups, use the first you find
+static std::string getSymbolBlurb(const hdoc::types::FreestandingFunction& f, const hdoc::types::Index& index) {
+  for(auto f : f.functionIDs) {
+    auto fs = index.functions.entries.at(f);
+    std::string ret = getSymbolBlurb(fs);
+    if(ret != "") {
+      return ret;
+    }
+  }
+  return "";
+}
+
 /// Run clang-format with a custom style over the given string
 std::string hdoc::serde::clangFormat(const std::string_view s, const uint64_t& columnLimit) {
   // Run clang-format over function name to break width to 50 chars
@@ -569,36 +580,50 @@ void hdoc::serde::HTMLWriter::printFunctions() const {
   CTML::Node main("main");
   main.AddChild(CTML::Node("h1", "Functions"));
 
+  // get and sort the list of freestanding function groups
+  std::vector<types::FreestandingFunctionID> sortedFunctionGroups;
+  for (const auto& [id, group] : this->index->freestandingFunctions) {
+    sortedFunctionGroups.push_back(id);
+  }
+  // sort by detail forst, then name
+  std::sort(sortedFunctionGroups.begin(), sortedFunctionGroups.end(), [&](const auto& a, const auto& b) {
+    const auto& fa = this->index->freestandingFunctions.at(a);
+    const auto& fb = this->index->freestandingFunctions.at(b);
+    if (fa.isDetail != fb.isDetail) {
+      return fb.isDetail;
+    }
+    return a.name < b.name;
+  });
+
   // Print a bullet list of functions
   uint64_t   numFunctions = 0; // Number of functions that aren't methods
   CTML::Node ul("ul");
-  for (const auto& id : getSortedIDs(map2vec(this->index->functions), this->index->functions)) {
-    const auto& f = this->index->functions.entries.at(id);
-    if (f.isRecordMember || f.isHiddenFriend) {
-      continue;
-    }
-    if (index->records.contains(f.parentNamespaceID)) {
-      // this is a friend declaration, skip it (hidden friends are already in records,
-      //                                        and other friends also have a separate definition)
-      continue;
-    }
+  for (const auto& id : sortedFunctionGroups) {
+    const auto& funs = this->index->freestandingFunctions.at(id);
     numFunctions += 1;
     auto li = CTML::Node("li")
-                    .AddChild(CTML::Node("a.is-family-code", f.name).SetAttr("href", f.relativeUrl()))
-                    .AppendText(getSymbolBlurb(f));
-    if (f.isDetail) li.ToggleClass("hdoc-detail");
+                    .AddChild(CTML::Node("a.is-family-code", id.name).SetAttr("href", getFunctionGroupURL(id, true)))
+                    .AppendText(getSymbolBlurb(funs, *this->index));
+    if (funs.isDetail) li.ToggleClass("hdoc-detail");
     ul.AddChild(li);
     CTML::Node page("main");
     this->pool.async(
-        [&](const hdoc::types::FunctionSymbol& func, CTML::Node pg) {
-          printFunction(func, pg, this->cfg->gitRepoURL, this->cfg->gitDefaultBranch);
+        [&](const hdoc::types::FreestandingFunction& func, CTML::Node pg) {
+          for (const auto individualFunctionID : func.functionIDs) {
+            printFunction(this->index->functions.entries.at(individualFunctionID),
+                          pg,
+                          this->cfg->gitRepoURL,
+                          this->cfg->gitDefaultBranch);
+          }
+          // use first symbol for breadcrumb, it doesn't matter
+          const auto firstSymbol = this->index->functions.entries.at(func.functionIDs.front());
           printNewPage(*this->cfg,
                        pg,
-                       this->cfg->outputDir / func.url(),
-                       "function " + func.name + ": " + this->cfg->getPageTitleSuffix(),
-                       getBreadcrumbNode("function", func, *this->index));
+                       this->cfg->outputDir / getFunctionGroupURL(id, false),
+                       "function " + id.name + ": " + this->cfg->getPageTitleSuffix(),
+                       getBreadcrumbNode("function", firstSymbol, *this->index));
         },
-        f,
+        funs,
         page);
   }
   this->pool.wait();
@@ -1048,7 +1073,7 @@ void hdoc::serde::HTMLWriter::printRecords() const {
 
 /// Recursively print an single namespace and all of its children
 /// Should be tail-call optimized
-static CTML::Node printNamespace(const hdoc::types::NamespaceSymbol& ns, const hdoc::types::Index& index) {
+CTML::Node hdoc::serde::HTMLWriter::printNamespace(const hdoc::types::NamespaceSymbol& ns) const {
   // Base case: stop recursion when namespace has no further children
   // and return an empty node, which will not be appended since we have a custom version of CTML
   if (ns.records.size() == 0 && ns.enums.size() == 0 && ns.namespaces.size() == 0 && ns.usings.size() == 0) {
@@ -1062,50 +1087,56 @@ static CTML::Node printNamespace(const hdoc::types::NamespaceSymbol& ns, const h
   }
   auto subUL = CTML::Node("ul");
 
-  const std::vector<hdoc::types::SymbolID> childNamespaces = getSortedIDs(ns.namespaces, index.namespaces);
-  const std::vector<hdoc::types::SymbolID> childRecords    = getSortedIDs(ns.records, index.records);
-  const std::vector<hdoc::types::SymbolID> childEnums      = getSortedIDs(ns.enums, index.enums);
-  const std::vector<hdoc::types::SymbolID> childAliases    = getSortedIDs(ns.usings, index.aliases);
-  const std::vector<hdoc::types::SymbolID> childFunctions  = getSortedIDs(ns.functions, index.functions);
+  const std::vector<hdoc::types::SymbolID> childNamespaces = getSortedIDs(ns.namespaces, index->namespaces);
+  const std::vector<hdoc::types::SymbolID> childRecords    = getSortedIDs(ns.records, index->records);
+  const std::vector<hdoc::types::SymbolID> childEnums      = getSortedIDs(ns.enums, index->enums);
+  const std::vector<hdoc::types::SymbolID> childAliases    = getSortedIDs(ns.usings, index->aliases);
+  const std::vector<hdoc::types::SymbolID> childFunctions  = getSortedIDs(ns.functions, index->functions);
 
   for (const auto& childID : childNamespaces) {
-    if (index.namespaces.contains(childID == false)) {
+    if (index->namespaces.contains(childID == false)) {
       continue;
     }
-    auto childNode = printNamespace(index.namespaces.entries.at(childID), index);
+    auto childNode = printNamespace(index->namespaces.entries.at(childID));
     subUL.AddChild(childNode);
   }
   for (const auto& childID : childRecords) {
-    if (index.records.contains(childID == false)) {
+    if (index->records.contains(childID == false)) {
       continue;
     }
-    const hdoc::types::RecordSymbol s = index.records.entries.at(childID);
+    const hdoc::types::RecordSymbol s = index->records.entries.at(childID);
     subUL.AddChild(
         CTML::Node("li.is-family-code").AddChild(CTML::Node("a", s.type + " " + s.name).SetAttr("href", s.relativeUrl())));
   }
   for (const auto& childID : childEnums) {
-    if (index.enums.contains(childID == false)) {
+    if (index->enums.contains(childID == false)) {
       continue;
     }
-    const hdoc::types::EnumSymbol s = index.enums.entries.at(childID);
+    const hdoc::types::EnumSymbol s = index->enums.entries.at(childID);
     subUL.AddChild(
         CTML::Node("li.is-family-code").AddChild(CTML::Node("a", s.type + " " + s.name).SetAttr("href", s.relativeUrl())));
   }
   for (const auto& childID : childAliases) {
-    if (index.aliases.contains(childID == false)) {
+    if (index->aliases.contains(childID == false)) {
       continue;
     }
-    const hdoc::types::AliasSymbol s = index.aliases.entries.at(childID);
+    const hdoc::types::AliasSymbol s = index->aliases.entries.at(childID);
     subUL.AddChild(
         CTML::Node("li.is-family-code").AddChild(CTML::Node("a", "using " + s.name).SetAttr("href", s.relativeUrl())));
   }
+  // Function groups in this namespace
+  std::set<types::FreestandingFunctionID> alreadyIncludedGroups;
   for (const auto& childID : childFunctions) {
-    if (index.functions.contains(childID == false)) {
+    if (index->functions.contains(childID == false)) {
       continue;
     }
-    const hdoc::types::FunctionSymbol s = index.functions.entries.at(childID);
+    const hdoc::types::FunctionSymbol s = index->functions.entries.at(childID);
+    if (s.freestandingID == types::notFreeStanding || alreadyIncludedGroups.contains(s.freestandingID)) {
+      continue;
+    }
+    alreadyIncludedGroups.insert(s.freestandingID);
     subUL.AddChild(
-        CTML::Node("li.is-family-code").AddChild(CTML::Node("a", "function " + s.name).SetAttr("href", s.relativeUrl())));
+        CTML::Node("li.is-family-code").AddChild(CTML::Node("a", "function " + s.name).SetAttr("href", getFunctionGroupURL(s.freestandingID, true))));
   }
   return enclosingDetails.AddChild(subUL);
 }
@@ -1123,7 +1154,7 @@ void hdoc::serde::HTMLWriter::printNamespaces() const {
     if (ns.parentNamespaceID.raw() != 0) {
       continue;
     }
-    namespaceTree.AddChild(printNamespace(ns, *this->index));
+    namespaceTree.AddChild(printNamespace(ns));
   }
   if (this->index->namespaces.entries.size() == 0) {
     main.AddChild(CTML::Node("p", "No namespaces were declared in this project."));
@@ -1310,5 +1341,52 @@ void hdoc::serde::HTMLWriter::processMarkdownFiles() const {
     std::string                    filename  = "doc" + f.filename().replace_extension("html").string();
     std::string                    pageTitle = f.filename().stem().string();
     printNewPage(*this->cfg, main, this->cfg->outputDir / filename, pageTitle, CTML::Node(), true);
+  }
+}
+
+std::string hdoc::serde::HTMLWriter::getNamespaceString(const hdoc::types::SymbolID& n) const {
+  std::vector<std::string> nsNames;
+  auto ns = n;
+  while(ns != 0) {
+    const auto& nss = this->index->namespaces.entries.at(ns);
+    nsNames.push_back(nss.name);
+    ns = nss.parentNamespaceID;
+  }
+  std::reverse(nsNames.begin(), nsNames.end());
+  std::string ret = "";
+  for(size_t i = 0; i < nsNames.size(); i++) {
+    ret += nsNames[i];
+    if(i != nsNames.size() - 1) {
+      ret += "_";
+    }
+  }
+  return ret;
+}
+
+std::string hdoc::serde::HTMLWriter::getFunctionURL(const hdoc::types::SymbolID& f, bool relative) const {
+  const auto& func = this->index->functions.entries.at(f);
+  if(func.freestandingID != types::notFreeStanding) {
+    // this function is printed in a page for its group
+    return getFunctionGroupURL(func.freestandingID, relative) + "#" + func.ID.str();
+  }
+  else {
+    // this function is part of its record
+    const auto record = this->index->records.entries.at(func.parentNamespaceID);
+    if(relative) {
+      return record.relativeUrl() + "#" + func.ID.str();
+    }
+    else {
+      return record.url() + "#" + func.ID.str();
+    }
+  }
+}
+
+std::string hdoc::serde::HTMLWriter::getFunctionGroupURL(const hdoc::types::FreestandingFunctionID& f, bool relative) const {
+  const auto namespaceStr = getNamespaceString(f.parentNamespaceID);
+  if(relative) {
+    return "../functions/" + namespaceStr + "-" + f.name + ".html";
+  }
+  else {
+    return "functions/" + namespaceStr + "-" + f.name + ".html";
   }
 }

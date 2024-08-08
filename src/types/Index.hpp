@@ -51,5 +51,6 @@ struct Index {
   Database<hdoc::types::EnumSymbol>      enums;
   Database<hdoc::types::NamespaceSymbol> namespaces;
   Database<hdoc::types::AliasSymbol>     aliases;
+  std::map<FreestandingFunctionID, FreestandingFunction> freestandingFunctions;
 };
 } // namespace hdoc::types

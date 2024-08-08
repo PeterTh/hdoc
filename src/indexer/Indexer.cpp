@@ -165,6 +165,32 @@ void hdoc::indexer::Indexer::updateMemberFunctions() {
   }
 }
 
+void hdoc::indexer::Indexer::resolveFunctionOverloads() {
+  for (auto& [k, f] : this->index.functions.entries) {
+    if (f.isRecordMember || f.isHiddenFriend || index.records.contains(f.parentNamespaceID)) {
+      // not a freestanding function
+      continue;
+    }
+    types::FreestandingFunctionID id   = {f.name, f.parentNamespaceID};
+    types::FreestandingFunction*  funs = [&]() {
+      if (index.freestandingFunctions.contains(id)) {
+        auto& existingFuns = index.freestandingFunctions.at(id);
+        if (existingFuns.isDetail != f.isDetail) {
+          spdlog::warn(
+              "Function {} has different isDetail values in different overloads. Using the value from the first overload processed.",
+              f.name);
+        }
+        return &existingFuns;
+      } else {
+        index.freestandingFunctions.insert({id, {f.isDetail, {}}});
+        return &index.freestandingFunctions.at(id);
+      }
+    }();
+    f.freestandingID = id;
+    funs->functionIDs.emplace_back(f.ID);
+  }
+}
+
 void hdoc::indexer::Indexer::printStats() const {
 
   const auto printDatabaseSize = []<typename T>(const char* name, const types::Database<T>& db) {
@@ -180,6 +206,7 @@ void hdoc::indexer::Indexer::printStats() const {
   printDatabaseSize("Enums", this->index.enums);
   printDatabaseSize("Namespaces", this->index.namespaces);
   printDatabaseSize("Usings", this->index.aliases);
+  spdlog::info("Freestanding function groups: {}", this->index.freestandingFunctions.size());
 }
 
 void hdoc::indexer::Indexer::pruneMethods() {

@@ -24,6 +24,9 @@ public:
   /// @brief Postprocess the member function string representations to eliminate stray type-parameter-0-0 etc.
   void updateMemberFunctions();
 
+  /// @brief Postprocess freestanding functions to merge them with their overloads and instantiations
+  void resolveFunctionOverloads();
+
   /// @brief Update NamespaceSymbols with the IDs of their children
   void resolveNamespaces();
 

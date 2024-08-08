@@ -38,9 +38,7 @@ struct SymbolID {
   uint64_t raw() const {
     return this->hashValue;
   }
-  bool operator==(const SymbolID& rhs) const {
-    return this->hashValue == rhs.hashValue;
-  }
+  auto operator<=>(const SymbolID& rhs) const = default;
 
   /// @brief Returns the SymbolID as a hex string, prepending leading zeros if needed
   std::string str() const {
@@ -170,6 +168,14 @@ struct RecordSymbol : public Symbol {
   }
 };
 
+/// @brief Unique identifier for functions that should be grouped (name + namespace)
+struct FreestandingFunctionID {
+  std::string name;
+  hdoc::types::SymbolID parentNamespaceID;
+  auto operator<=>(const FreestandingFunctionID& rhs) const = default;
+};
+const FreestandingFunctionID notFreeStanding = {"", SymbolID(0)};
+
 /// @brief Represents a function parameter
 struct FunctionParam {
   std::string          name;         ///< Name given to the parameter
@@ -208,6 +214,7 @@ public:
   std::string                returnTypeDocComment; ///< Any comment attached to a @return(s) or \return(s) command
   std::vector<FunctionParam> params;               ///< All of the template parameters for this function
   std::vector<TemplateParam> templateParams;       ///< All of the parameters for this function
+  FreestandingFunctionID     freestandingID = notFreeStanding; ///< Unique identifier for this function overload group
 
   virtual const std::string directory() const override {
     return "functions";
@@ -252,6 +259,11 @@ public:
   virtual const std::string directory() const override {
     return "namespaces";
   }
+};
+
+struct FreestandingFunction {
+  bool isDetail = false;
+  std::vector<hdoc::types::SymbolID> functionIDs;
 };
 
 } // namespace hdoc::types
