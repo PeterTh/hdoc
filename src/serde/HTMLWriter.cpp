@@ -1024,7 +1024,7 @@ void hdoc::serde::HTMLWriter::printRecords() const {
 static CTML::Node printNamespace(const hdoc::types::NamespaceSymbol& ns, const hdoc::types::Index& index) {
   // Base case: stop recursion when namespace has no further children
   // and return an empty node, which will not be appended since we have a custom version of CTML
-  if (ns.records.size() == 0 && ns.enums.size() == 0 && ns.namespaces.size() == 0) {
+  if (ns.records.size() == 0 && ns.enums.size() == 0 && ns.namespaces.size() == 0 && ns.usings.size() == 0) {
     return CTML::Node("");
   }
 
@@ -1039,6 +1039,7 @@ static CTML::Node printNamespace(const hdoc::types::NamespaceSymbol& ns, const h
   const std::vector<hdoc::types::SymbolID> childRecords    = getSortedIDs(ns.records, index.records);
   const std::vector<hdoc::types::SymbolID> childEnums      = getSortedIDs(ns.enums, index.enums);
   const std::vector<hdoc::types::SymbolID> childAliases    = getSortedIDs(ns.usings, index.aliases);
+  const std::vector<hdoc::types::SymbolID> childFunctions  = getSortedIDs(ns.functions, index.functions);
 
   for (const auto& childID : childNamespaces) {
     if (index.namespaces.contains(childID == false)) {
@@ -1070,6 +1071,14 @@ static CTML::Node printNamespace(const hdoc::types::NamespaceSymbol& ns, const h
     const hdoc::types::AliasSymbol s = index.aliases.entries.at(childID);
     subUL.AddChild(
         CTML::Node("li.is-family-code").AddChild(CTML::Node("a", "using " + s.name).SetAttr("href", s.relativeUrl())));
+  }
+  for (const auto& childID : childFunctions) {
+    if (index.functions.contains(childID == false)) {
+      continue;
+    }
+    const hdoc::types::FunctionSymbol s = index.functions.entries.at(childID);
+    subUL.AddChild(
+        CTML::Node("li.is-family-code").AddChild(CTML::Node("a", "function " + s.name).SetAttr("href", s.relativeUrl())));
   }
   return enclosingDetails.AddChild(subUL);
 }

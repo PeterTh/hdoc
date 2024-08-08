@@ -84,6 +84,11 @@ void hdoc::indexer::Indexer::resolveNamespaces() {
         ns.usings.emplace_back(v.ID);
       }
     }
+    for (const auto& [k, v] : this->index.functions.entries) {
+      if (isChild(ns, v)) {
+        ns.functions.emplace_back(v.ID);
+      }
+    }
   }
   spdlog::info("Indexer namespace resolution complete.");
 }

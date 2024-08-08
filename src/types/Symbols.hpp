@@ -245,6 +245,7 @@ public:
   std::vector<hdoc::types::SymbolID> namespaces = {}; ///< All of the other namespaces in this namespace
   std::vector<hdoc::types::SymbolID> enums      = {}; ///< All of the enums in this namespace
   std::vector<hdoc::types::SymbolID> usings     = {}; ///< All of the usings in this namespace
+  std::vector<hdoc::types::SymbolID> functions  = {}; ///< All of the functions in this namespace
 
   virtual const std::string directory() const override {
     return "namespaces";
