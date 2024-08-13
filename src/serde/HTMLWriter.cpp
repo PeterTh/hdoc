@@ -335,16 +335,6 @@ std::string hdoc::serde::getBareTypeName(const std::string_view typeName) {
   return str;
 }
 
-std::string getRecordUrl(const hdoc::types::SymbolID& id) {
-  return "../" + hdoc::types::RecordSymbol().directory() + "/" + id.str() + ".html";
-};
-std::string getEnumURL(const hdoc::types::SymbolID& id) {
-  return "../" + hdoc::types::EnumSymbol().directory() + "/" + id.str() + ".html";
-};
-std::string getAliasURL(const hdoc::types::SymbolID& id) {
-  return "../" + hdoc::types::AliasSymbol().directory() + "/" + id.str() + ".html";
-};
-
 /// Replaces type names in a function proto with hyperlinked references to
 /// those types. Works for indexed records and std:: types found in the map above.
 std::string hdoc::serde::HTMLWriter::getHyperlinkedFunctionProto(const std::string_view             proto,
@@ -353,22 +343,10 @@ std::string hdoc::serde::HTMLWriter::getHyperlinkedFunctionProto(const std::stri
 
   str = escapeForHTML(str);
 
-  auto getUrlForSymbol = [&](const hdoc::types::SymbolID& id) -> std::string {
-    if (index->records.contains(id)) {
-      return getRecordUrl(id);
-    } else if (index->enums.contains(id)) {
-      return getEnumURL(id);
-    } else if (index->aliases.contains(id)) {
-      return getAliasURL(id);
-    } else {
-      return "";
-    }
-  };
-
   std::size_t index              = 0;
   std::string bareReturnTypeName = getBareTypeName(f.returnType.name);
   if (f.returnType.id.hashValue != 0) {
-    std::string targetUrl = getUrlForSymbol(f.returnType.id);
+    std::string targetUrl = getURLForSymbol(f.returnType.id, true);
     if(targetUrl != "") {
       std::string replacement = "<a href=\"" + targetUrl + "\">" + bareReturnTypeName + "</a>";
       index                   = hdoc::utils::replaceFirst(str, bareReturnTypeName, replacement, index);
@@ -386,7 +364,7 @@ std::string hdoc::serde::HTMLWriter::getHyperlinkedFunctionProto(const std::stri
   for (const auto& param : f.params) {
     std::string bareParamTypeName = getBareTypeName(param.type.name);
     if (param.type.id.hashValue != 0) {
-      std::string targetUrl = getUrlForSymbol(param.type.id);
+      std::string targetUrl = getURLForSymbol(param.type.id, true);
       if(targetUrl != "") {
         std::string replacement = "<a href=\"" + targetUrl + "\">" + bareParamTypeName + "</a>";
         index                   = hdoc::utils::replaceFirst(str, bareParamTypeName, replacement, index);
@@ -408,7 +386,7 @@ std::string hdoc::serde::HTMLWriter::getHyperlinkedFunctionProto(const std::stri
 /// Returns the typename as raw HTML with hyperlinks where possible.
 /// Indexed types are hyperlinked to, as are certain std:: types.
 /// All others are returned without hyperlinks as the plain type name.
-static std::string getHyperlinkedTypeName(const hdoc::types::TypeRef& type) {
+std::string hdoc::serde::HTMLWriter::getHyperlinkedTypeName(const hdoc::types::TypeRef& type) const {
   std::string fullTypeName = type.name;
   std::string bareTypeName = hdoc::serde::getBareTypeName(fullTypeName);
 
@@ -431,7 +409,7 @@ static std::string getHyperlinkedTypeName(const hdoc::types::TypeRef& type) {
   }
   // The type is in the database, so we link to it.
   else {
-    std::string replacement = "<a href=\"" + getRecordUrl(type.id) + "\">" + bareTypeName + "</a>";
+    std::string replacement = "<a href=\"" + getURLForSymbol(type.id, true) + "\">" + bareTypeName + "</a>";
     hdoc::utils::replaceFirst(fullTypeName, bareTypeName, replacement);
     return fullTypeName;
   }
@@ -455,8 +433,9 @@ static CTML::Node getDeclaredAtNode(const hdoc::types::Symbol& s,
 }
 
 /// Creates a Bulma breadcrumb node to make the provenance of the current symbol more clear and aid in navigation.
-static CTML::Node
-getBreadcrumbNode(const std::string& prefix, const hdoc::types::Symbol& s, const hdoc::types::Index& index) {
+CTML::Node hdoc::serde::HTMLWriter::getBreadcrumbNode(const std::string&         prefix,
+                                                      const hdoc::types::Symbol& s,
+                                                      const hdoc::types::Index&  index) const {
   // Symbols that have no parents don't have any breadcrumbs.
   if (s.parentNamespaceID.raw() == 0) {
     return CTML::Node();
@@ -498,7 +477,7 @@ getBreadcrumbNode(const std::string& prefix, const hdoc::types::Symbol& s, const
     if (parent.symbolType == "namespace") {
       a = CTML::Node("a").SetAttr("href", entryPageUrl<hdoc::types::NamespaceSymbol>(false) + "#" + parent.symbol.ID.str());
     } else {
-      a = CTML::Node("a").SetAttr("href", getRecordUrl(parent.symbol.ID));
+      a = CTML::Node("a").SetAttr("href", getURLForSymbol(parent.symbol.ID, true));
     }
     auto span = CTML::Node("span", parent.symbolType + " " + parent.symbol.name);
 
@@ -671,10 +650,10 @@ static std::string getAliasHTML(const hdoc::types::AliasSymbol& a) {
 }
 
 /// Print an alias to main
-static void printAlias(const hdoc::types::AliasSymbol& a,
-                       CTML::Node&                     main,
-                       const std::string_view          gitRepoURL,
-                       const std::string_view          gitDefaultBranch) {
+void hdoc::serde::HTMLWriter::printAlias(const hdoc::types::AliasSymbol& a,
+                                         CTML::Node&                     main,
+                                         const std::string_view          gitRepoURL,
+                                         const std::string_view          gitDefaultBranch) const {
   auto        inner = CTML::Node("code.hdoc-function-code.language-cpp").AppendRawHTML(getAliasHTML(a));
   main.AddChild(CTML::Node("h3#" + a.ID.str())
                     .AddChild(CTML::Node("pre.p-0.hdoc-pre-parent")
@@ -801,7 +780,9 @@ static std::vector<hdoc::types::RecordSymbol::BaseRecord> getInheritedSymbols(co
   return vec;
 }
 
-static void printMemberVariables(const hdoc::types::RecordSymbol& c, CTML::Node& main, const bool& isInherited) {
+void hdoc::serde::HTMLWriter::printMemberVariables(const hdoc::types::RecordSymbol& c,
+                                                   CTML::Node&                      main,
+                                                   const bool&                      isInherited) const {
   CTML::Node dl("dl");
   uint64_t   numVars = 0;
 
@@ -1385,6 +1366,28 @@ std::string hdoc::serde::HTMLWriter::getNamespaceString(const hdoc::types::Symbo
     }
   }
   return ret;
+}
+
+std::string getRecordUrl(const hdoc::types::SymbolID& id, bool relative) {
+  return (relative?"../":"") + hdoc::types::RecordSymbol().directory() + "/" + id.str() + ".html";
+};
+std::string getEnumURL(const hdoc::types::SymbolID& id, bool relative) {
+  return (relative?"../":"") + hdoc::types::EnumSymbol().directory() + "/" + id.str() + ".html";
+};
+std::string getAliasURL(const hdoc::types::SymbolID& id, bool relative) {
+  return (relative?"../":"") + hdoc::types::AliasSymbol().directory() + "/" + id.str() + ".html";
+};
+
+std::string hdoc::serde::HTMLWriter::getURLForSymbol(const hdoc::types::SymbolID& id, bool relative) const {
+  if (index->records.contains(id)) {
+    return getRecordUrl(id, relative);
+  } else if (index->enums.contains(id)) {
+    return getEnumURL(id, relative);
+  } else if (index->aliases.contains(id)) {
+    return getAliasURL(id, relative);
+  } else {
+    return "";
+  }
 }
 
 std::string hdoc::serde::HTMLWriter::getFunctionURL(const hdoc::types::SymbolID& f, bool relative) const {

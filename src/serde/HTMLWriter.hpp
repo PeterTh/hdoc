@@ -49,9 +49,19 @@ private:
   std::string getNamespaceString(const hdoc::types::SymbolID& n) const;
 
   // @brief Get the URL for a given symbol
+  std::string getURLForSymbol(const hdoc::types::SymbolID& id, bool relative) const;
   std::string getFunctionURL(const hdoc::types::SymbolID& f, bool relative) const;
   std::string getFunctionGroupURL(const hdoc::types::FreestandingFunctionID& f, bool relative) const;
-  
+
+  void        printMemberVariables(const hdoc::types::RecordSymbol& c, CTML::Node& main, const bool& isInherited) const;
+  void        printAlias(const hdoc::types::AliasSymbol& a,
+                         CTML::Node&                     main,
+                         const std::string_view          gitRepoURL,
+                         const std::string_view          gitDefaultBranch) const;
+
+  CTML::Node  getBreadcrumbNode(const std::string& prefix, const hdoc::types::Symbol& s, const hdoc::types::Index& index) const;
+
+  std::string getHyperlinkedTypeName(const hdoc::types::TypeRef& type) const;
   std::string getHyperlinkedFunctionProto(const std::string_view proto, const hdoc::types::FunctionSymbol& f) const;
 };
 std::string clangFormat(const std::string_view s, const uint64_t& columnLimit = 50);
